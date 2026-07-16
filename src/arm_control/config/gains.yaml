@@ -1,5 +1,0 @@
-controller_node:
-  ros__parameters:
-    kp: [40.0, 40.0, 20.0]
-    kd: [8.0, 8.0, 4.0]
-    gravity_compensation: true
