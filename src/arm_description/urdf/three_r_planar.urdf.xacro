@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<robot name="three_r_planar" xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- TODO: set link lengths to match Study-of-Robot-Dynamics/models/three_r_planar.py -->
+  <xacro:property name="l1" value="1.0"/>
+  <xacro:property name="l2" value="1.0"/>
+  <xacro:property name="l3" value="1.0"/>
+
+  <link name="world"/>
+
+  <link name="base_link">
+    <visual><geometry><cylinder radius="0.05" length="0.1"/></geometry></visual>
+  </link>
+  <joint name="world_to_base" type="fixed">
+    <parent link="world"/><child link="base_link"/>
+  </joint>
+
+  <!-- TODO: add link1/link2/link3 with visual boxes/cylinders sized to l1,l2,l3,
+       and revolute joint1/2/3 about z-axis at each link origin -->
+
+</robot>
