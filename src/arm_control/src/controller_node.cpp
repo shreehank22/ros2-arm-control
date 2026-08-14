@@ -3,6 +3,9 @@
 #include "std_msgs/msg/float64_multi_array.hpp"
 #include "iostream"
 #include "Eigen/Dense"
+#include <pinocchio/parsers/urdf.hpp>
+#include <pinocchio/algorithm/rnea.hpp>
+#include <memory>
 
 class ControllerNode : public rclcpp::Node{
     public:
@@ -11,6 +14,10 @@ class ControllerNode : public rclcpp::Node{
             joint_state_subscriber = this->create_subscription<sensor_msgs::msg::JointState>(
                 "/joint_states", 10, std::bind(&ControllerNode::jointStateCallback, this, std::placeholders::_1));
                 RCLCPP_INFO(this->get_logger(),"Subscribed to /joint_states");
+            std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+            pinocchio::urdf::buildModel(urdf_path, model_);
+            data_ = std::make_unique<pinocchio::Data>(model_);
+            RCLCPP_INFO(this->get_logger(), "Loaded URDF. nq = %d, nv = %d", model_.nq, model_.nv);
         }
         void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
             Eigen::Map<Eigen::VectorXd> q_map(msg->position.data(), msg->position.size());
@@ -23,6 +30,8 @@ class ControllerNode : public rclcpp::Node{
         Eigen::VectorXd q_current = Eigen::VectorXd::Zero(6);
         Eigen::VectorXd qdot_current = Eigen::VectorXd::Zero(6);
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscriber;
+        pinocchio::Model model_;
+        std::unique_ptr<pinocchio::Data> data_;
 
         
 };
