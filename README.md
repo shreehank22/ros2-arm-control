@@ -1,30 +1,49 @@
-# arm_ws — 3R Planar Arm: ROS2 PD Control
+# ROS 2 UR5e Arm Control
 
-ROS2 Jazzy project porting kinematics/dynamics from `Study-of-Robot-Dynamics`
-into a live pub/sub control loop.
+A ROS 2 Jazzy simulation of a UR5e robot arm with Pinocchio-based rigid-body dynamics and a PD controller with gravity compensation.
 
 ## Packages
-- `arm_description` — URDF/xacro of the 3R planar arm, RViz display launch
-- `arm_sim` — dynamics-based integrator node (owns true M(q), C(q,qdot), G(q))
-- `arm_control` — PD + gravity-compensation controller node
-- `arm_traj_gen` — quintic polynomial joint-space trajectory generator
-- `arm_bringup` — launch file bringing up the full system
+
+- `arm_sim` — integrates UR5e dynamics and publishes `/joint_states`
+- `arm_control` — publishes torque commands to `/joint_efforts`
+- `arm_description` — URDF-based RViz visualization
+
+## Requirements
+
+- ROS 2 Jazzy
+- `colcon`
+- Pinocchio
+- Universal Robots ROS description package (`ur_description`)
 
 ## Build
+
 ```bash
-mamba activate ros2_jazzy
-cd ~/arm_ws
+cd ~/ros2-arm-control
 colcon build --symlink-install
 source install/setup.zsh
 ```
 
 ## Run
+
+Start the simulator and controller in separate terminals:
+
 ```bash
-ros2 launch arm_bringup full_system.launch.py
+ros2 run arm_sim sim_node
+ros2 run arm_control controller_node
 ```
 
-## Build order
-1. `arm_description` — verify URDF renders correctly in RViz
-2. `arm_sim` alone with zero torque — check gravity-driven motion matches RNEA ground truth
-3. `arm_control` with fixed setpoint — check step response settles
-4. `arm_traj_gen` — full trajectory tracking
+Visualize the robot in RViz:
+
+```bash
+ros2 launch arm_description display.launch.py
+```
+
+Or launch the interactive Foxglove workflow:
+
+```bash
+./scripts/launch_robot.sh
+```
+
+## License
+
+MIT
