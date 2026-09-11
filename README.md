@@ -36,7 +36,7 @@ Start the Gazebo simulation:
 
 ```
 
-```bash
+```
 ros2 launch arm_sim sim.launch.py
 ```
 
@@ -44,7 +44,7 @@ Start the controller in a separate terminal:
 
 ```
 
-```bash
+```
 ros2 run arm_control controller_node
 ```
 
@@ -60,7 +60,7 @@ Visualize the robot in RViz:
 
 ```
 
-```bash
+```
 ros2 launch arm_description display.launch.py
 ```
 
