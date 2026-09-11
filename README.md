@@ -35,7 +35,6 @@ source install/setup.zsh
 Start the Gazebo simulation:
 
 ```
-```
 
 ```bash
 ros2 launch arm_sim sim.launch.py
@@ -43,7 +42,6 @@ ros2 launch arm_sim sim.launch.py
 
 Start the controller in a separate terminal:
 
-```
 ```
 
 ```bash
@@ -53,7 +51,6 @@ ros2 run arm_control controller_node
 The controller publishes effort commands to:
 
 ```
-```
 
 ```text
 /effort_controller/commands
@@ -62,7 +59,6 @@ The controller publishes effort commands to:
 Visualize the robot in RViz:
 
 ```
-```
 
 ```bash
 ros2 launch arm_description display.launch.py
@@ -70,7 +66,6 @@ ros2 launch arm_description display.launch.py
 
 Or launch the interactive Foxglove workflow:
 
-```
 ```
 
 ```bash
@@ -82,7 +77,6 @@ Or launch the interactive Foxglove workflow:
 Check controller status:
 
 ```
-```
 
 ```bash
 ros2 control list_controllers
@@ -90,7 +84,6 @@ ros2 control list_controllers
 
 Check joint states:
 
-```
 ```
 
 ```bash
@@ -100,7 +93,6 @@ ros2 topic echo /joint_states
 Check effort commands:
 
 ```
-```
 
 ```bash
 ros2 topic echo /effort_controller/commands
@@ -108,7 +100,6 @@ ros2 topic echo /effort_controller/commands
 
 Check simulation time:
 
-```
 ```
 
 ```bash
@@ -119,5 +110,4 @@ ros2 topic echo /clock
 
 MIT
 
-```
 ```
