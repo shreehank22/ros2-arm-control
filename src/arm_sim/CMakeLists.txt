@@ -11,6 +11,23 @@ add_executable(sim_node src/sim_node.cpp)
 target_link_libraries(sim_node pinocchio::pinocchio)
 ament_target_dependencies(sim_node rclcpp sensor_msgs std_msgs)
 
-install(TARGETS sim_node DESTINATION lib/${PROJECT_NAME})
+install(TARGETS sim_node
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(
+  DIRECTORY urdf/
+  DESTINATION share/${PROJECT_NAME}/urdf
+)
+
+install(
+  DIRECTORY worlds/
+  DESTINATION share/${PROJECT_NAME}/worlds
+)
+
+install(
+  DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
+)
 
 ament_package()

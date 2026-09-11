@@ -12,5 +12,6 @@ target_link_libraries(controller_node pinocchio::pinocchio)
 ament_target_dependencies(controller_node rclcpp sensor_msgs std_msgs)
 
 install(TARGETS controller_node DESTINATION lib/${PROJECT_NAME})
+install(DIRECTORY config/ DESTINATION share/${PROJECT_NAME}/config)
 
 ament_package()

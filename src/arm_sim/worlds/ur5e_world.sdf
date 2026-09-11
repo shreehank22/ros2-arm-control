@@ -1,0 +1,123 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <world name="ur5e_world">
+
+    <!-- ========================================================= -->
+    <!-- Physics                                                   -->
+    <!-- ========================================================= -->
+
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <!-- Gravity -->
+    <gravity>0 0 -9.81</gravity>
+
+
+    <!-- ========================================================= -->
+    <!-- Lighting                                                  -->
+    <!-- ========================================================= -->
+
+    <!-- Sun / directional light -->
+    <light name="sun" type="directional">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.3 0.2 -1.0</direction>
+    </light>
+
+
+    <!-- ========================================================= -->
+    <!-- Ground Plane                                               -->
+    <!-- ========================================================= -->
+
+    <model name="ground_plane">
+      <static>true</static>
+
+      <link name="link">
+
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+        </collision>
+
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>20 20</size>
+            </plane>
+          </geometry>
+        </visual>
+
+      </link>
+    </model>
+
+
+    <!-- ========================================================= -->
+    <!-- Robot Platform / Table                                     -->
+    <!-- ========================================================= -->
+
+    <model name="robot_platform">
+  <static>true</static>
+
+  <!-- Platform center is 0.20 m above the ground.
+       Height = 0.40 m, so top surface = 0.40 m. -->
+  <pose>0 0 0.20 0 0 0</pose>
+
+  <link name="platform_link">
+
+    <collision name="collision">
+      <geometry>
+        <box>
+          <size>1.2 1.2 0.4</size>
+        </box>
+      </geometry>
+    </collision>
+
+    <visual name="visual">
+      <geometry>
+        <box>
+          <size>1.2 1.2 0.4</size>
+        </box>
+      </geometry>
+
+      <material>
+        <ambient>0.6 0.6 0.6 1</ambient>
+        <diffuse>0.7 0.7 0.7 1</diffuse>
+        <specular>0.2 0.2 0.2 1</specular>
+      </material>
+    </visual>
+
+  </link>
+</model>
+
+
+    <!-- ========================================================= -->
+    <!-- Gazebo Sim Systems                                        -->
+    <!-- ========================================================= -->
+
+    <!-- Physics system -->
+    <plugin
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics"/>
+
+    <!-- User commands -->
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands"/>
+
+    <!-- Scene broadcaster -->
+    <plugin
+      filename="gz-sim-scene-broadcaster-system"
+      name="gz::sim::systems::SceneBroadcaster"/>
+
+  </world>
+</sdf>

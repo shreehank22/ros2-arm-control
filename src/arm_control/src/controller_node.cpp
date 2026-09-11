@@ -11,7 +11,7 @@ class ControllerNode : public rclcpp::Node {
         ControllerNode() : Node("controller_node") {
             RCLCPP_INFO(this->get_logger(), "Controller Node initiated");
             joint_state_subscriber = this->create_subscription<sensor_msgs::msg::JointState>("/joint_states", 10, std::bind(&ControllerNode::jointStateCallback, this, std::placeholders::_1));
-            joint_effort_publisher = this->create_publisher<std_msgs::msg::Float64MultiArray>("/joint_efforts", 10);
+            joint_effort_publisher = this->create_publisher<std_msgs::msg::Float64MultiArray>("/effort_controller/commands", 10);
             std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
             pinocchio::urdf::buildModel(urdf_path, model_);
             data_ = std::make_unique<pinocchio::Data>(model_);
