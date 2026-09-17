@@ -1,0 +1,39 @@
+#pragma once
+
+#include <Eigen/Dense>
+#include <pinocchio/fwd.hpp>
+
+struct IKResult
+{
+    Eigen::VectorXd q;
+    bool converged;
+    int n_iter;
+    double pos_err;
+    double rot_err;
+};
+
+class DLSIK
+{
+public:
+    DLSIK(
+        const pinocchio::Model& model,
+        pinocchio::FrameIndex ee_frame);
+
+    IKResult solve(
+        const Eigen::VectorXd& q0,
+        const Eigen::Vector3d& p_des,
+        const Eigen::Matrix3d& R_des);
+
+private:
+    Eigen::Vector3d logSO3(
+        const Eigen::Matrix3d& R);
+
+    pinocchio::Model model_;
+    pinocchio::FrameIndex ee_frame_;
+
+    double k_;
+    double lambda_max_;
+    double epsilon_;
+    int max_iter_;
+    double tol_;
+};
