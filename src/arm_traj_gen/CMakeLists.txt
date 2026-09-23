@@ -5,6 +5,7 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(pinocchio REQUIRED)
+find_package(ament_cmake_gtest REQUIRED)
 
 include_directories(
   include
@@ -21,6 +22,16 @@ target_link_libraries(traj_gen_node
 
 ament_target_dependencies(traj_gen_node
   rclcpp
+)
+
+ament_add_gtest(test_dls_ik
+  tests/test_dls_ik.cpp
+  src/dls_ik.cpp
+)
+
+target_link_libraries(test_dls_ik
+  Eigen3::Eigen
+  pinocchio::pinocchio
 )
 
 install(TARGETS

@@ -2,6 +2,7 @@
 
 #include <Eigen/Dense>
 #include <pinocchio/multibody/model.hpp>
+#include <pinocchio/multibody/data.hpp>
 
 struct IKResult
 {
@@ -28,7 +29,11 @@ private:
     Eigen::Vector3d logSO3(
         const Eigen::Matrix3d& R);
 
+    Eigen::MatrixXd computeJacobian(
+        const Eigen::VectorXd& q);
+
     pinocchio::Model model_;
+    pinocchio::Data data_;
     pinocchio::FrameIndex ee_frame_;
 
     double k_;
