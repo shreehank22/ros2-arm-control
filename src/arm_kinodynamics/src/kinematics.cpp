@@ -1,4 +1,4 @@
-#include "arm_dynamics/kinematics.hpp"
+#include "arm_kinodynamics/kinematics.hpp"
 
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
@@ -33,7 +33,7 @@ RobotKinematics::RobotKinematics(const std::string& urdf_path)
     k_ = 0.1;
     lambda_max_ = 0.1;
     epsilon_ = 1e-6;
-    max_iter_ = 300;
+    max_iter_ = 1000;
     tol_ = 1e-4;
 }
 
@@ -160,9 +160,23 @@ IKResult RobotKinematics::solveIK(const Eigen::VectorXd& q0,const Eigen::Vector3
         e.head<3>() = e_pos;
         e.tail<3>() = e_rot;
 
-        // Error magnitudes
+        const double w_p = 1.0;
+        const double w_r = 0.85;
+
+        Eigen::VectorXd weighted_e(6);
+        weighted_e.head<3>() = w_p * e_pos;
+        weighted_e.tail<3>() = w_r * e_rot;
+
         pos_err = e_pos.norm();
         rot_err = e_rot.norm();
+
+        if (iter%50==0)
+        {
+            std::cout << "Iteration: " << iter
+                      << " | Position error: " << pos_err
+                      << " | Rotation error: " << rot_err
+                      << std::endl;
+        }
 
         // Check convergence
         if (pos_err < tol_ && rot_err < tol_)
@@ -196,7 +210,7 @@ IKResult RobotKinematics::solveIK(const Eigen::VectorXd& q0,const Eigen::Vector3
 
         // Damped least-squares solution
         Eigen::MatrixXd J_dls = svd.matrixV()*S_inv.asDiagonal()*svd.matrixU().transpose();
-        Eigen::VectorXd dq = J_dls * e;
+        Eigen::VectorXd dq = J_dls * weighted_e;
 
 
         // Step scaling

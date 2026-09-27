@@ -4,13 +4,10 @@
 
 #include <cmath>
 #include <string>
-
-
 #include <memory>
-
-
-#include "arm_dynamics/dynamics.hpp"
-#include "arm_dynamics/kinematics.hpp"
+#include "arm_kinodynamics/dynamics.hpp"
+#include "arm_kinodynamics/kinematics.hpp"
+#include "vector"
 
 
 // test scripts for dynamics and kinematics of the robot arm
@@ -223,6 +220,93 @@ TEST(RobotKinematicsTest, IKMultipleConfigurations)
 
         EXPECT_LT(position_error, epsilon_p) << "Position error too large for case: " << cfg.name;
         EXPECT_LT(rotation_error, epsilon_R) << "Rotation error too large for case: " << cfg.name;
+    }
+}
+
+TEST (RobotKinematicsTest, TestJacobianAtMultipleConfigurations)
+{
+    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    RobotKinematics robot_kinematics(urdf_path);
+
+    std::vector<Eigen::VectorXd> test_configs = {
+        (Eigen::VectorXd(6) << 0.0, -M_PI / 2.0, 0.0, -M_PI / 2.0, 0.0, 0.0).finished(),
+        (Eigen::VectorXd(6) << 0.3, -1.2, 0.8, -1.0, 0.5, 0.2).finished(),
+        (Eigen::VectorXd(6) << -0.5, -0.8, 1.8, -2.0, -0.7, 1.0).finished(),
+        (Eigen::VectorXd(6) << 1.5, -2.0, 1.5, -1.0, 1.0, -1.0).finished(),
+        (Eigen::VectorXd(6) << 0.2, -1.0, 1.0, -1.57, 0.0, 0.3).finished()
+    };
+
+    const double epsilon = 1e-6;
+
+    for (const auto& q : test_configs)
+    {
+        Eigen::MatrixXd jacobian = robot_kinematics.getJacobian(q);
+        EXPECT_EQ(jacobian.rows(), 6);
+        EXPECT_EQ(jacobian.cols(), 6);
+        EXPECT_TRUE(jacobian.allFinite());
+
+        Eigen::MatrixXd numerical_jacobian(3, 6);
+        for (int i = 0; i < 6; ++i)
+        {
+            Eigen::VectorXd q_plus = q;
+            Eigen::VectorXd q_minus = q;
+
+            q_plus(i) += epsilon;
+            q_minus(i) -= epsilon;
+
+            Eigen::Vector3d p_plus = robot_kinematics.getPosition(q_plus);
+            Eigen::Vector3d p_minus = robot_kinematics.getPosition(q_minus);
+            numerical_jacobian.col(i) = (p_plus - p_minus) / (2.0 * epsilon);
+        }
+
+        Eigen::MatrixXd analytical_jacobian = jacobian.topRows(3);
+        EXPECT_TRUE(analytical_jacobian.isApprox(numerical_jacobian, 1e-5));
+    }
+}   
+
+TEST (RobotKinematicsTest, IKRoundTripMultipleConfigurations)
+{
+    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    RobotKinematics robot_kinematics(urdf_path);
+
+    Eigen::VectorXd q_test(6);
+    q_test << 0.0, -M_PI / 2.0, 0.0, -M_PI / 2.0, 0.0, 0.0;
+
+    Eigen::Vector3d p_test = robot_kinematics.getPosition(q_test);
+    Eigen::Matrix3d R_test = robot_kinematics.getRotation(q_test);
+
+    std::vector<Eigen::VectorXd> initial_guesses = {
+        (Eigen::VectorXd(6) << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0).finished(),
+        (Eigen::VectorXd(6) << 1.5, -1.0, 1.5, -0.5, 1.0, -1.0).finished(),
+        (Eigen::VectorXd(6) << -1.0, -1.8, 0.3, -1.2, -0.8, 0.5).finished(),
+        (Eigen::VectorXd(6) << 0.5, -0.3, 2.0, -2.0, 0.2, 1.5).finished()
+    };
+
+    const double epsilon_p = 1e-4;
+    const double epsilon_R = 1e-3;
+
+    for (size_t i = 0; i < initial_guesses.size(); ++i)
+    {
+        IKResult ik_result = robot_kinematics.solveIK(initial_guesses[i], p_test, R_test);
+        EXPECT_TRUE(ik_result.converged) << "Failed to converge for initial guess index: " << i;
+        if (!ik_result.converged) 
+        {
+            std::cerr << "Failed to converge for initial guess index: " << i << std::endl;
+            continue;
+        }
+
+        Eigen::Vector3d p_result = robot_kinematics.getPosition(ik_result.q);
+        Eigen::Matrix3d R_result = robot_kinematics.getRotation(ik_result.q);
+
+        double position_error = (p_test - p_result).norm();
+        double rotation_error = robot_kinematics.logSO3(R_test * R_result.transpose()).norm();
+
+        std::cout << "[Initial Guess " << i << "] pos_err: " << position_error
+                  << " | rot_err: " << rotation_error
+                  << " | iters: " << ik_result.n_iter << "\n";
+
+        EXPECT_LT(position_error, epsilon_p) << "Position error too large for initial guess index: " << i;
+        EXPECT_LT(rotation_error, epsilon_R) << "Rotation error too large for initial guess index: " << i;
     }
 }
 

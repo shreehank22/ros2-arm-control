@@ -1,4 +1,4 @@
-#include "arm_dynamics/dynamics.hpp"
+#include "arm_kinodynamics/dynamics.hpp"
 
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/algorithm/crba.hpp>
