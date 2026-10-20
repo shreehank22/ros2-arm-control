@@ -69,9 +69,24 @@ def generate_launch_description():
             "-file", robot_description_file,
             "-x", "0.0",
             "-y", "0.0",
-            "-z", "0.4"
+            "-z", "0.4",
+
+            # UR5e Home configuration
+            "-J", "shoulder_pan_joint", "0.0",
+            "-J", "shoulder_lift_joint", "-1.571",
+            "-J", "elbow_joint", "0.0",
+            "-J", "wrist_1_joint", "-1.571",
+            "-J", "wrist_2_joint", "0.0",
+            "-J", "wrist_3_joint", "0.0",
         ],
         output="screen"
+    )
+
+    joint_state_broadcaster = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["joint_state_broadcaster", "--controller-manager-timeout", "60"],
+        output="screen",
     )
 
     return LaunchDescription([
@@ -79,4 +94,5 @@ def generate_launch_description():
         gz_bridge,
         robot_state_publisher,
         spawn_robot,
+        joint_state_broadcaster,
     ])
