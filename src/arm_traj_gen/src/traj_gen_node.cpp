@@ -4,6 +4,7 @@
 
 #include "arm_traj_gen/trajectory.hpp"
 #include <algorithm>
+#include <cmath>
 #include <exception>
 
 #include <Eigen/Dense>
@@ -12,6 +13,8 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <cmath>
+#include <iterator>
 
 class TrajectoryGeneratorNode : public rclcpp::Node
 {
@@ -49,22 +52,41 @@ private:
             return;
         }
 
-        if (msg->position.size() != 6 || msg->name.size() != 6) {
+        if (msg->position.size() != msg->name.size() ||
+            msg->position.size() != 6) {
             RCLCPP_WARN_THROTTLE(
                 get_logger(), *get_clock(), 2000,
-                "Waiting for six named joint positions.");
+                "Invalid joint state dimensions");
             return;
         }
 
-        // Keep the message ordering for now. Verify it matches the
-        // controller and URDF joint order before running the robot.
+        for (const double position : msg->position) {
+            if (!std::isfinite(position)) {
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 2000,
+                    "Non-finite joint position received; ignoring message.");
+                return;
+            }
+        }
+
+        const auto it = std::find(
+            msg->name.begin(), msg->name.end(), "shoulder_pan_joint");
+
+        if (it == msg->name.end()) {
+            RCLCPP_WARN_THROTTLE(
+                get_logger(), *get_clock(), 2000,
+                "shoulder_pan_joint not found in /joint_states");
+            return;
+        }
+
+        // Keep the message ordering; the target joint is picked by name.
         q_start_ = Eigen::Map<const Eigen::VectorXd>(
             msg->position.data(), 6);
 
         joint_names_ = msg->name;
 
         q_end_ = q_start_;
-        q_end_[0] += 0.1;  // Move joint 1 by +0.1 radians.
+        q_end_[std::distance(msg->name.begin(), it)] += 0.1;
 
         try {
             trajectory_ =
@@ -82,7 +104,7 @@ private:
 
         RCLCPP_INFO(
             get_logger(),
-            "Trajectory initialized: joint 1 target offset = +0.1 rad, duration = %.1f s.",
+            "Trajectory target: shoulder_pan_joint +0.1 rad, duration = %.1f s.",
             duration_);
     }
 
