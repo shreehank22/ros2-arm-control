@@ -32,34 +32,51 @@ source install/setup.zsh
 
 ## Run
 
-Start the Gazebo simulation:
+### Launch the simulation
+
+`sim.launch.py` starts Gazebo Sim with the UR5e world, the `/clock` bridge, `robot_state_publisher`, spawns the robot, and starts the `joint_state_broadcaster`:
 
 ```bash
 ros2 launch arm_sim sim.launch.py
 ```
 
-Start the controller in a separate terminal:
+### Spawn the robot manually
+
+The launch file spawns the UR5e at the home configuration with `ros_gz_sim create`. To spawn it by hand (e.g. into an already running world):
+
+```bash
+ros2 run ros_gz_sim create \
+  -name ur5e \
+  -file src/arm_sim/urdf/ur5e.urdf \
+  -x 0.0 -y 0.0 -z 0.4 \
+  -J shoulder_pan_joint 0.0 \
+  -J shoulder_lift_joint -1.571 \
+  -J elbow_joint 0.0 \
+  -J wrist_1_joint -1.571 \
+  -J wrist_2_joint 0.0 \
+  -J wrist_3_joint 0.0
+```
+
+Spawn the joint state broadcaster:
+
+```bash
+ros2 run controller_manager spawner joint_state_broadcaster --controller-manager-timeout 60
+```
+
+### Start the controller
+
+In a separate terminal:
 
 ```bash
 ros2 run arm_control controller_node
 ```
 
-The controller publishes effort commands to:
+The controller publishes effort commands to `/effort_controller/commands`.
 
-```
-/effort_controller/commands
-```
-
-Visualize the robot in RViz:
+### Visualize in RViz
 
 ```bash
 ros2 launch arm_description display.launch.py
-```
-
-Or launch the interactive Foxglove workflow:
-
-```bash
-./scripts/launch_robot.sh
 ```
 
 ## Useful Commands
