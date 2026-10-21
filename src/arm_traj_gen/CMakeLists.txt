@@ -5,6 +5,8 @@ project(arm_traj_gen)
 find_package(ament_cmake REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(ament_cmake_gtest REQUIRED)
+find_package(ament_cmake_pytest REQUIRED)
+find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(pinocchio REQUIRED)
@@ -12,6 +14,7 @@ find_package(pinocchio REQUIRED)
 # Quintic trajectory library
 add_library(${PROJECT_NAME}
   src/trajectory.cpp
+  src/joint_limits.cpp
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -22,6 +25,7 @@ target_include_directories(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME}
   Eigen3::Eigen
+  pinocchio::pinocchio
 )
 
 # Trajectory generator ROS 2 node
@@ -35,6 +39,7 @@ target_link_libraries(traj_gen_node
 )
 
 ament_target_dependencies(traj_gen_node
+  ament_index_cpp
   rclcpp
   sensor_msgs
 )
@@ -46,6 +51,25 @@ ament_add_gtest(test_trajectory
 
 target_link_libraries(test_trajectory
   ${PROJECT_NAME}
+)
+
+ament_add_gtest(test_joint_limits
+  tests/test_joint_limits.cpp
+)
+
+target_link_libraries(test_joint_limits
+  ${PROJECT_NAME}
+)
+
+target_compile_definitions(test_joint_limits PRIVATE
+  UR5E_URDF_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../arm_sim/urdf/ur5e.urdf"
+)
+
+# Integration test: fake /joint_states -> traj_gen_node -> /desired_joint_states (isolated domain)
+ament_add_pytest_test(test_traj_gen_node_integration
+  tests/test_traj_gen_node_integration.py
+  ENV TRAJ_GEN_NODE=$<TARGET_FILE:traj_gen_node>
+  TIMEOUT 120
 )
 
 # Install library and export it
