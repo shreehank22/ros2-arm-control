@@ -1,16 +1,20 @@
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 
+#include "arm_traj_gen/joint_limits.hpp"
 #include "arm_traj_gen/trajectory.hpp"
 #include <algorithm>
 #include <cmath>
 #include <exception>
+#include <filesystem>
 
 #include <Eigen/Dense>
 #include <chrono>
 #include <functional>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <cmath>
@@ -22,6 +26,14 @@ public:
     TrajectoryGeneratorNode()
     : Node("traj_gen_node")
     {
+        // Joint limits come from the same URDF the controller and sim use.
+        const std::string urdf_path = resolveUrdfPath();
+        joint_limits_ = std::make_unique<JointLimits>(
+            JointLimits::fromUrdf(urdf_path));
+        RCLCPP_INFO(
+            get_logger(), "Loaded limits for %zu joints from %s",
+            joint_limits_->size(), urdf_path.c_str());
+
         joint_state_subscriber_ =
             create_subscription<sensor_msgs::msg::JointState>(
                 "/joint_states",
@@ -45,6 +57,26 @@ public:
     }
 
 private:
+    // Resolves the URDF: the urdf_path parameter if set, otherwise the installed arm_sim share directory.
+    std::string resolveUrdfPath()
+    {
+        std::string path = declare_parameter<std::string>("urdf_path", "");
+        if (path.empty()) {
+            try {
+                path = ament_index_cpp::get_package_share_directory("arm_sim") +
+                    "/urdf/ur5e.urdf";
+            } catch (const std::exception &e) {
+                throw std::runtime_error(
+                    std::string("Cannot locate package 'arm_sim' to find ur5e.urdf "
+                                "(is it built and sourced?): ") + e.what());
+            }
+        }
+        if (!std::filesystem::exists(path)) {
+            throw std::runtime_error("URDF file not found: " + path);
+        }
+        return path;
+    }
+
     void jointStateCallback(
         const sensor_msgs::msg::JointState::SharedPtr msg)
     {
@@ -87,6 +119,14 @@ private:
 
         q_end_ = q_start_;
         q_end_[std::distance(msg->name.begin(), it)] += 0.1;
+
+        std::string limit_error;
+        if (!joint_limits_->check(msg->name, q_start_, q_end_, limit_error)) {
+            RCLCPP_WARN_THROTTLE(
+                get_logger(), *get_clock(), 2000,
+                "%s Refusing trajectory.", limit_error.c_str());
+            return;
+        }
 
         try {
             trajectory_ =
@@ -161,6 +201,7 @@ private:
     Eigen::VectorXd q_end_;
 
     std::vector<std::string> joint_names_;
+    std::unique_ptr<JointLimits> joint_limits_;
 
     rclcpp::Time start_time_{0, 0, RCL_ROS_TIME};
 
