@@ -9,7 +9,9 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
+  <depend>ament_index_cpp</depend>
   <depend>rclcpp</depend>
+  <exec_depend>arm_sim</exec_depend>
   <depend>sensor_msgs</depend>
   <depend>std_msgs</depend>
 
