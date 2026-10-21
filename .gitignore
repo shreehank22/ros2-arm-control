@@ -2,3 +2,6 @@ build/
 install/
 log/
 .vscode/
+# Python cache files
+__pycache__/
+*.py[cod]
