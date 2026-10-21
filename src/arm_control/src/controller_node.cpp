@@ -15,6 +15,7 @@
 #include <string>
 #include <chrono>
 #include <functional>
+#include "arm_control/control_state.hpp"
 
 class ControllerNode : public rclcpp::Node {
 
@@ -60,6 +61,7 @@ class ControllerNode : public rclcpp::Node {
         }
 
         // receives desired joint targets from the trajectory generator node
+
         void desiredStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
         {
 
@@ -78,49 +80,75 @@ class ControllerNode : public rclcpp::Node {
         }
 
         // compute the control effort using PD control and publish it
+
         void ComputeControlEffort(){
 
-            if (!has_measured_state || !has_desired_state) {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Waiting for states: measured = %d, desired = %d", has_measured_state, has_desired_state);
-                return;
-            }
-
-            // do not command effort from stale measured or desired states
+            // fresh measurements and desired states 
             const rclcpp::Time current_time = this->now();
-            if ((current_time - last_measured_time).seconds() > state_timeout || (current_time - last_desired_time).seconds() > state_timeout) {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Stale state: measured age = %.3f s, desired age = %.3f s (timeout %.3f s); publishing gravity compensation only", (current_time - last_measured_time).seconds(), (current_time - last_desired_time).seconds(), state_timeout);
+            const bool desired_fresh = (current_time - last_desired_time).seconds() < state_timeout;
+            const bool measured_fresh = (current_time - last_measured_time).seconds() < state_timeout;
+            RCLCPP_DEBUG(this->get_logger(), "Freshness: measured = %d, desired = %d", measured_fresh, desired_fresh);
 
-                // fallback: hold against gravity at the last measured pose, with no PD terms
-                pinocchio::computeGeneralizedGravity(model_, *data_, q_current);
-                Eigen::VectorXd fallback_effort = data_->g.cwiseMax(-effort_limit).cwiseMin(effort_limit);
-                publishEffort(fallback_effort);
-                return;
+            // decide the next state based on the freshness of the measured and desired states
+
+            State next_state = nextState(has_measured_state, has_desired_state, measured_fresh, desired_fresh);
+
+            // log only when it changes 
+            
+            if (next_state != current_state) {
+
+                RCLCPP_INFO(this->get_logger(), "State transition: %s -> %s", stateName(current_state), stateName(next_state));
+                current_state = next_state;
+                
             }
 
-             if (q_current.size() != 6 || qdot_current.size() != 6 || q_desired.size() != 6 || qdot_desired.size() != 6) {
-                RCLCPP_ERROR(this->get_logger(),"Stored state has incorrect size: q_current = %zu, qdot_current = %zu, q_desired = %zu, qdot_desired = %zu", (size_t)q_current.size(), (size_t)qdot_current.size(), (size_t)q_desired.size(), (size_t)qdot_desired.size()
-            );
-            return; }
+            // update the state machine
 
-            Eigen::VectorXd position_error = q_desired - q_current;
-            Eigen::VectorXd velocity_error = qdot_desired - qdot_current;
+            switch (current_state){
 
-            // compute generalized gravity for gravity compensation
+                case State::WAITING:
 
-            pinocchio::computeGeneralizedGravity(model_, *data_, q_current);
+                    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Waiting for a measured joint state...");
+
+                    return;
+
+                case State::FALLBACK:
+
+                    RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Falling back to gravity compensation only");
+                    
+                    // compute generalized gravity for gravity compensation
+
+                    pinocchio::computeGeneralizedGravity(model_, *data_, q_current);
+
+                    // limit the control effort to a reasonable range
+                    publishEffort(data_->g.cwiseMax(-effort_limit).cwiseMin(effort_limit));
             
+                    return;
+                
+                case State::TRACKING:
+                {
 
-            // PD control with gravity compensation
+                    RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Tracking desired trajectory");
 
-            Eigen::VectorXd control_effort = Kp.cwiseProduct(position_error) + Kd.cwiseProduct(velocity_error) + data_->g;
+                    Eigen::VectorXd position_error = q_desired - q_current;
+                    Eigen::VectorXd velocity_error = qdot_desired - qdot_current;
 
-            // limit control effort to a reasonable range
-            control_effort = control_effort.cwiseMax(-effort_limit).cwiseMin(effort_limit);
+
+                    // PD control with gravity compensation
+
+                    pinocchio::computeGeneralizedGravity(model_, *data_, q_current);
+
+                    Eigen::VectorXd control_effort = Kp.cwiseProduct(position_error) + Kd.cwiseProduct(velocity_error) + data_->g;
+
+                    control_effort = control_effort.cwiseMax(-effort_limit).cwiseMin(effort_limit);
         
-            publishEffort(control_effort);
+                    publishEffort(control_effort);
 
-            RCLCPP_INFO_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Published control effort: [%f, %f, %f, %f, %f, %f]", control_effort[0], control_effort[1], control_effort[2], control_effort[3], control_effort[4], control_effort[5]);
+                    return;
+                
+                }
 
+            }
         }
 
     private:
@@ -128,14 +156,14 @@ class ControllerNode : public rclcpp::Node {
         std::string resolveUrdfPath()
         {
             std::string path = declare_parameter<std::string>("urdf_path", "");
+
             if (path.empty()) {
                 try {
-                    path = ament_index_cpp::get_package_share_directory("arm_sim") +
-                        "/urdf/ur5e.urdf";
+                    path = ament_index_cpp::get_package_share_directory("arm_sim") + "/urdf/ur5e.urdf";
+
                 } catch (const std::exception &e) {
                     throw std::runtime_error(
-                        std::string("Cannot locate package 'arm_sim' to find ur5e.urdf "
-                                    "(is it built and sourced?): ") + e.what());
+                        std::string("Cannot locate package 'arm_sim' to find ur5e.urdf ""(is it built and sourced?): ") + e.what());
                 }
             }
             if (!std::filesystem::exists(path)) {
@@ -144,7 +172,9 @@ class ControllerNode : public rclcpp::Node {
             return path;
         }
         // publishes a joint effort vector (URDF joint order) to the effort controller
+
         void publishEffort(const Eigen::VectorXd &effort) {
+
             std_msgs::msg::Float64MultiArray effort_msg;
             effort_msg.data.resize(effort.size());
 
@@ -157,6 +187,7 @@ class ControllerNode : public rclcpp::Node {
 
         // Reorders a JointState message into the fixed joint order used by the URDF and the effort controller.
         // Returns false and logs an error if a joint is missing or any value is not finite.
+
         bool reorderToModelOrder(const sensor_msgs::msg::JointState &msg, Eigen::VectorXd &q_out, Eigen::VectorXd &qdot_out) {
             const std::array<std::string, 6> joint_names = {"shoulder_pan_joint","shoulder_lift_joint","elbow_joint","wrist_1_joint","wrist_2_joint","wrist_3_joint"};
 
@@ -200,8 +231,10 @@ class ControllerNode : public rclcpp::Node {
 
         // per-joint effort limits, matching the URDF <limit effort=...> values
         Eigen::VectorXd effort_limit = (Eigen::VectorXd(6) << 150.0, 150.0, 150.0, 28.0, 28.0, 28.0).finished();
+
         bool has_measured_state = false;
         bool has_desired_state = false;
+
         rclcpp::Time last_measured_time{0, 0, RCL_ROS_TIME};
         rclcpp::Time last_desired_time{0, 0, RCL_ROS_TIME};
 
@@ -210,13 +243,21 @@ class ControllerNode : public rclcpp::Node {
         const double state_timeout = 0.2;
         Eigen::VectorXd Kp = (Eigen::VectorXd(6) << 30.0, 30.0, 20.0, 5.0, 5.0, 2.0).finished();
         Eigen::VectorXd Kd = (Eigen::VectorXd(6) << 10.0, 10.0, 8.0, 3.0, 3.0, 1.0).finished();
+
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscriber;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr desired_state_subscriber;
         rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr joint_effort_publisher;
+        
         rclcpp::TimerBase::SharedPtr control_timer;
         pinocchio::Model model_;
         std::unique_ptr<pinocchio::Data> data_;
 
+        
+
+        // current state of the controller state machine
+        State current_state = State::WAITING;
+
+        
 };
 
 
