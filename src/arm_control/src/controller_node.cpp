@@ -1,10 +1,13 @@
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <Eigen/Dense>
 #include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/algorithm/rnea.hpp>
+#include <filesystem>
 #include <memory>
+#include <stdexcept>
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -26,7 +29,7 @@ class ControllerNode : public rclcpp::Node {
             desired_state_subscriber = this->create_subscription<sensor_msgs::msg::JointState>("/desired_joint_states", 10, std::bind(&ControllerNode::desiredStateCallback, this, std::placeholders::_1));
 
             joint_effort_publisher = this->create_publisher<std_msgs::msg::Float64MultiArray>("/effort_controller/commands", 10);
-            std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+            std::string urdf_path = resolveUrdfPath();
             pinocchio::urdf::buildModel(urdf_path, model_);
             data_ = std::make_unique<pinocchio::Data>(model_);
             RCLCPP_INFO(this->get_logger(), "Loaded URDF. nq = %d, nv = %d", model_.nq, model_.nv);
@@ -121,6 +124,25 @@ class ControllerNode : public rclcpp::Node {
         }
 
     private:
+        // Resolves the URDF: the urdf_path parameter if set, otherwise the installed arm_sim share directory.
+        std::string resolveUrdfPath()
+        {
+            std::string path = declare_parameter<std::string>("urdf_path", "");
+            if (path.empty()) {
+                try {
+                    path = ament_index_cpp::get_package_share_directory("arm_sim") +
+                        "/urdf/ur5e.urdf";
+                } catch (const std::exception &e) {
+                    throw std::runtime_error(
+                        std::string("Cannot locate package 'arm_sim' to find ur5e.urdf "
+                                    "(is it built and sourced?): ") + e.what());
+                }
+            }
+            if (!std::filesystem::exists(path)) {
+                throw std::runtime_error("URDF file not found: " + path);
+            }
+            return path;
+        }
         // publishes a joint effort vector (URDF joint order) to the effort controller
         void publishEffort(const Eigen::VectorXd &effort) {
             std_msgs::msg::Float64MultiArray effort_msg;
