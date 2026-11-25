@@ -1,6 +1,6 @@
 #include "arm_kinodynamics/kinematics.hpp"
+#include "arm_kinodynamics/arm_model.hpp"
 
-#include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/algorithm/kinematics.hpp>
 #include <pinocchio/algorithm/frames.hpp>
 #include <pinocchio/algorithm/jacobian.hpp>
@@ -13,20 +13,20 @@
 
 RobotKinematics::RobotKinematics(const std::string& urdf_path)
 {
-    // Load the URDF model
-    pinocchio::urdf::buildModel(urdf_path, model_);
+    // Load the arm model: FR3 URDF with the finger joints locked (7 DoF, hand mass kept)
+    model_ = loadArmModel(urdf_path, {"fr3_finger_joint1", "fr3_finger_joint2"}).model;
 
     // Create data associated with the model
     data_ = pinocchio::Data(model_);
 
     // Find the end-effector frame
-    if (model_.existFrame("tool0"))
+    if (model_.existFrame("fr3_hand_tcp"))
     {
-        ee_frame_ = model_.getFrameId("tool0");
+        ee_frame_ = model_.getFrameId("fr3_hand_tcp");
     }
     else
     {
-        throw std::runtime_error("Frame 'tool0' not found in the model.");
+        throw std::runtime_error("Frame 'fr3_hand_tcp' not found in the model.");
     }
 
     // DLS IK parameters
@@ -90,27 +90,23 @@ Eigen::Vector3d RobotKinematics::logSO3(const Eigen::Matrix3d& R)
     // Near-pi case
     else if (std::abs(theta - M_PI) < 1e-4)
     {
-        Eigen::Matrix3d A = (R + Eigen::Matrix3d::Identity()) / 2.0;
+        // The symmetric part of R gives A = n * n^T, which fixes the axis up to its sign:
+        // take the column with the largest diagonal entry (the best-conditioned one).
+        const double c = std::cos(theta);
+        Eigen::Matrix3d A = (0.5 * (R + R.transpose()) - c * Eigen::Matrix3d::Identity()) / (1.0 - c);
 
-        Eigen::Vector3d n;
+        Eigen::Index k = 0;
+        A.diagonal().maxCoeff(&k);
 
-        n(0) =std::sqrt(std::max(0.0, A(0, 0)));
+        Eigen::Vector3d n = A.col(k) / std::sqrt(std::max(A(k, k), 1e-12));
+        n.normalize();
 
-        n(1) =std::sqrt(std::max(0.0, A(1, 1)));
+        // The skew part of R is 2 sin(theta) [n]x: it gives the sign of n when theta < pi.
+        const Eigen::Vector3d skew_vec(R(2, 1) - R(1, 2), R(0, 2) - R(2, 0), R(1, 0) - R(0, 1));
+        if (n.dot(skew_vec) < 0.0)
+            n = -n;
 
-        n(2) = std::sqrt(std::max(0.0, A(2, 2)));
-
-
-        if (A(0, 1) < 0.0)
-            n(1)=-n(1);
-
-        if (A(0,2) < 0.0)
-            n(2)=-n(2);
-
-        if (A(1, 2)< 0.0)
-            n(2)=-n(2);
-
-        return M_PI * n;
+        return theta * n;
     }
 
     // General case
