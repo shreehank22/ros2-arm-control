@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <sdf version="1.9">
-  <world name="ur5e_world">
+  <world name="fr3_world">
 
     <!-- ========================================================= -->
     <!-- Physics                                                   -->
