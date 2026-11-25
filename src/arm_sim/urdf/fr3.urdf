@@ -10,8 +10,12 @@
     2. Renamed the root link "base" to "world" so the arm is fixed to the world in Gazebo.
     3. Rewrote mesh paths package://franka_description/ -> package://arm_sim/
        (meshes copied into arm_sim/meshes with franka_description's LICENSE and NOTICE).
-    4. Added the ros2_control block (effort-commanded arm, position-commanded finger) and
+    4. Added the ros2_control block (effort-commanded arm, position-commanded fingers) and
        the gz_ros2_control <gazebo> plugin at the end of the file.
+
+  The plugin's <parameters> path uses $(find arm_control): load this file through xacro
+  (as sim.launch.py does) so it resolves to the installed gz_controllers.yaml.
+  Pinocchio ignores the <gazebo> block, so the nodes can read this file directly.
 -->
 <robot name="fr3">
   <!-- safety_distance: Minimum safety distance in [m] by which the collision volumes are expanded and which is enforced during robot motions -->
@@ -549,8 +553,21 @@
         <param name="initial_value">0.0</param>
       </state_interface>
     </joint>
-    <!-- gripper: fr3_finger_joint2 is left out for now; it mimics fr3_finger_joint1 in the URDF -->
+    <!-- gripper: both fingers are listed. Gazebo's default physics engine (DART) does not support
+         the URDF <mimic> on fr3_finger_joint2, so without its own entry that finger is undriven.
+         Listed here, gz_ros2_control holds both fingers until a gripper controller commands them.
+         mimic="false" tells ros2_control to treat fr3_finger_joint2 as an independent joint
+         (otherwise it rejects the command interface on a URDF mimic joint). -->
     <joint name="fr3_finger_joint1">
+      <command_interface name="position"/>
+      <state_interface name="position">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+      <state_interface name="velocity">
+        <param name="initial_value">0.0</param>
+      </state_interface>
+    </joint>
+    <joint name="fr3_finger_joint2" mimic="false">
       <command_interface name="position"/>
       <state_interface name="position">
         <param name="initial_value">0.0</param>
@@ -563,7 +580,7 @@
 
   <gazebo>
     <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
-      <parameters>/home/shreehank1906/ros2-arm-control/install/arm_control/share/arm_control/config/gz_controllers.yaml</parameters>
+      <parameters>$(find arm_control)/config/gz_controllers.yaml</parameters>
     </plugin>
   </gazebo>
 </robot>
