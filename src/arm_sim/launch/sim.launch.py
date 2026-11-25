@@ -1,8 +1,18 @@
+import os
+
+from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import IncludeLaunchDescription
+from launch.actions import (
+    AppendEnvironmentVariable,
+    DeclareLaunchArgument,
+    IncludeLaunchDescription,
+    RegisterEventHandler,
+)
+from launch.event_handlers import OnProcessExit
 from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, PathJoinSubstitution
+from launch.substitutions import Command, LaunchConfiguration, PathJoinSubstitution, PythonExpression
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
 
 
@@ -10,22 +20,39 @@ def generate_launch_description():
 
     arm_sim_share = FindPackageShare("arm_sim")
 
+    headless = LaunchConfiguration("headless")
+    declare_headless = DeclareLaunchArgument(
+        "headless",
+        default_value="false",
+        description="Run Gazebo without the GUI (server only)",
+    )
+
     world_file = PathJoinSubstitution([
         arm_sim_share,
         "worlds",
-        "ur5e_world.sdf"
+        "fr3_world.sdf"
     ])
 
     robot_description_file = PathJoinSubstitution([
         arm_sim_share,
         "urdf",
-        "ur5e.urdf"
+        "fr3.urdf"
     ])
 
-    robot_description = Command([
-        "cat ",
-        robot_description_file
-    ])
+    # xacro resolves $(find arm_control) in the gz_ros2_control <parameters> path
+    robot_description = ParameterValue(
+        Command([
+            "xacro ",
+            robot_description_file
+        ]),
+        value_type=str
+    )
+
+    # lets Gazebo resolve the package://arm_sim/meshes/... paths in the URDF
+    gz_resource_path = AppendEnvironmentVariable(
+        "GZ_SIM_RESOURCE_PATH",
+        os.path.dirname(get_package_share_directory("arm_sim"))
+    )
 
     gazebo = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -36,7 +63,11 @@ def generate_launch_description():
             ])
         ),
         launch_arguments={
-            "gz_args": ["-r ", world_file]
+            "gz_args": [
+                "-r ",
+                PythonExpression(["'-s ' if '", headless, "' == 'true' else ''"]),
+                world_file
+            ]
         }.items()
     )
 
@@ -61,23 +92,25 @@ def generate_launch_description():
         ]
     )
 
+    # spawned from /robot_description so Gazebo gets the xacro-processed URDF
     spawn_robot = Node(
         package="ros_gz_sim",
         executable="create",
         arguments=[
-            "-name", "ur5e",
-            "-file", robot_description_file,
+            "-name", "fr3",
+            "-topic", "robot_description",
             "-x", "0.0",
             "-y", "0.0",
             "-z", "0.4",
 
-            # UR5e Home configuration
-            "-J", "shoulder_pan_joint", "0.0",
-            "-J", "shoulder_lift_joint", "-1.571",
-            "-J", "elbow_joint", "0.0",
-            "-J", "wrist_1_joint", "-1.571",
-            "-J", "wrist_2_joint", "0.0",
-            "-J", "wrist_3_joint", "0.0",
+            # FR3 home configuration
+            "-J", "fr3_joint1", "0.0",
+            "-J", "fr3_joint2", "-0.7854",
+            "-J", "fr3_joint3", "0.0",
+            "-J", "fr3_joint4", "-2.3562",
+            "-J", "fr3_joint5", "0.0",
+            "-J", "fr3_joint6", "1.5708",
+            "-J", "fr3_joint7", "0.7854",
         ],
         output="screen"
     )
@@ -89,10 +122,29 @@ def generate_launch_description():
         output="screen",
     )
 
+    # effort controller that receives controller_node's /effort_controller/commands
+    effort_controller = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["effort_controller", "--controller-manager-timeout", "60"],
+        output="screen",
+    )
+
+    # start the effort controller once the joint state broadcaster is up
+    effort_controller_after_broadcaster = RegisterEventHandler(
+        OnProcessExit(
+            target_action=joint_state_broadcaster,
+            on_exit=[effort_controller],
+        )
+    )
+
     return LaunchDescription([
+        declare_headless,
+        gz_resource_path,
         gazebo,
         gz_bridge,
         robot_state_publisher,
         spawn_robot,
         joint_state_broadcaster,
+        effort_controller_after_broadcaster,
     ])
