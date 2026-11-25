@@ -7,7 +7,7 @@ set -e
 WS_DIR="$HOME/ros2-arm-control"
 
 echo "=== Killing lingering processes ==="
-for proc in sim_node controller_node traj_gen_node rviz2 robot_state_publisher joint_state_publisher_gui rqt_plot; do
+for proc in "gz sim" parameter_bridge controller_node traj_gen_node rviz2 robot_state_publisher joint_state_publisher_gui rqt_plot; do
     if pgrep -f "$proc" > /dev/null; then
         echo "Killing $proc..."
         pkill -9 -f "$proc"
@@ -19,7 +19,7 @@ done
 echo ""
 echo "=== Verifying nothing left ==="
 sleep 1
-REMAINING=$(ps aux | grep -E "sim_node|controller_node|traj_gen_node|rviz2|robot_state_publisher|joint_state_publisher_gui|rqt_plot" | grep -v grep || true)
+REMAINING=$(ps aux | grep -E "gz sim|parameter_bridge|controller_node|traj_gen_node|rviz2|robot_state_publisher|joint_state_publisher_gui|rqt_plot" | grep -v grep || true)
 if [ -n "$REMAINING" ]; then
     echo "WARNING: some processes survived:"
     echo "$REMAINING"
