@@ -3,6 +3,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 
+#include "arm_kinodynamics/arm_model.hpp"
 #include "arm_traj_gen/joint_limits.hpp"
 #include "arm_traj_gen/trajectory.hpp"
 #include <algorithm>
@@ -26,10 +27,14 @@ public:
     TrajectoryGeneratorNode()
     : Node("traj_gen_node")
     {
-        // Joint limits come from the same URDF the controller and sim use.
+        // Joint names and limits come from the same arm model the controller uses
+        // (FR3 URDF with the finger joints locked).
         const std::string urdf_path = resolveUrdfPath();
+        const ArmModel arm = loadArmModel(
+            urdf_path, {"fr3_finger_joint1", "fr3_finger_joint2"});
+        joint_names_ = arm.joint_names;
         joint_limits_ = std::make_unique<JointLimits>(
-            JointLimits::fromUrdf(urdf_path));
+            JointLimits::fromModel(arm.model));
         RCLCPP_INFO(
             get_logger(), "Loaded limits for %zu joints from %s",
             joint_limits_->size(), urdf_path.c_str());
@@ -64,10 +69,10 @@ private:
         if (path.empty()) {
             try {
                 path = ament_index_cpp::get_package_share_directory("arm_sim") +
-                    "/urdf/ur5e.urdf";
+                    "/urdf/fr3.urdf";
             } catch (const std::exception &e) {
                 throw std::runtime_error(
-                    std::string("Cannot locate package 'arm_sim' to find ur5e.urdf "
+                    std::string("Cannot locate package 'arm_sim' to find fr3.urdf "
                                 "(is it built and sourced?): ") + e.what());
             }
         }
@@ -84,8 +89,9 @@ private:
             return;
         }
 
-        if (msg->position.size() != msg->name.size() ||
-            msg->position.size() != 6) {
+        // /joint_states may carry more joints than the arm (e.g. the fingers),
+        // so only the name/position pairing is checked here.
+        if (msg->position.size() != msg->name.size()) {
             RCLCPP_WARN_THROTTLE(
                 get_logger(), *get_clock(), 2000,
                 "Invalid joint state dimensions");
@@ -101,27 +107,38 @@ private:
             }
         }
 
-        const auto it = std::find(
-            msg->name.begin(), msg->name.end(), "shoulder_pan_joint");
+        // Pick the arm joints out of the message by name, in model order (joint_names_).
+        q_start_.resize(static_cast<Eigen::Index>(joint_names_.size()));
+        for (std::size_t i = 0; i < joint_names_.size(); ++i) {
+            const auto joint = std::find(
+                msg->name.begin(), msg->name.end(), joint_names_[i]);
 
-        if (it == msg->name.end()) {
+            if (joint == msg->name.end()) {
+                RCLCPP_WARN_THROTTLE(
+                    get_logger(), *get_clock(), 2000,
+                    "%s not found in /joint_states", joint_names_[i].c_str());
+                return;
+            }
+            q_start_[static_cast<Eigen::Index>(i)] =
+                msg->position[static_cast<std::size_t>(std::distance(msg->name.begin(), joint))];
+        }
+
+        // The target joint is picked by name.
+        const auto it = std::find(
+            joint_names_.begin(), joint_names_.end(), "fr3_joint1");
+
+        if (it == joint_names_.end()) {
             RCLCPP_WARN_THROTTLE(
                 get_logger(), *get_clock(), 2000,
-                "shoulder_pan_joint not found in /joint_states");
+                "fr3_joint1 not found in the arm model");
             return;
         }
 
-        // Keep the message ordering; the target joint is picked by name.
-        q_start_ = Eigen::Map<const Eigen::VectorXd>(
-            msg->position.data(), 6);
-
-        joint_names_ = msg->name;
-
         q_end_ = q_start_;
-        q_end_[std::distance(msg->name.begin(), it)] += 0.1;
+        q_end_[std::distance(joint_names_.begin(), it)] += 0.1;
 
         std::string limit_error;
-        if (!joint_limits_->check(msg->name, q_start_, q_end_, limit_error)) {
+        if (!joint_limits_->check(joint_names_, q_start_, q_end_, limit_error)) {
             RCLCPP_WARN_THROTTLE(
                 get_logger(), *get_clock(), 2000,
                 "%s Refusing trajectory.", limit_error.c_str());
@@ -144,7 +161,7 @@ private:
 
         RCLCPP_INFO(
             get_logger(),
-            "Trajectory target: shoulder_pan_joint +0.1 rad, duration = %.1f s.",
+            "Trajectory target: fr3_joint1 +0.1 rad, duration = %.1f s.",
             duration_);
     }
 
@@ -169,10 +186,10 @@ private:
         msg.header.stamp = now();
         msg.name = joint_names_;
 
-        msg.position.resize(6);
-        msg.velocity.resize(6);
+        msg.position.resize(joint_names_.size());
+        msg.velocity.resize(joint_names_.size());
 
-        for (std::size_t i = 0; i < 6; ++i) {
+        for (std::size_t i = 0; i < joint_names_.size(); ++i) {
             msg.position[i] = q_desired[i];
             msg.velocity[i] = qdot_desired[i];
         }
