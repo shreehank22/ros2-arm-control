@@ -3,19 +3,19 @@
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <Eigen/Dense>
-#include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/algorithm/rnea.hpp>
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <iterator>
 #include <string>
 #include <chrono>
 #include <functional>
+#include <vector>
 #include "arm_control/control_state.hpp"
+#include "arm_kinodynamics/arm_model.hpp"
 
 class ControllerNode : public rclcpp::Node {
 
@@ -24,19 +24,37 @@ class ControllerNode : public rclcpp::Node {
 
             RCLCPP_INFO(this->get_logger(), "Controller Node initiated");
 
-            // Initialize desired joint positions and velocities
+            std::string urdf_path = resolveUrdfPath();
 
+            // arm-only model: finger joints are locked, their mass stays in the model for gravity compensation
+            ArmModel arm = loadArmModel(urdf_path, {"fr3_finger_joint1", "fr3_finger_joint2"});
+            model_ = std::move(arm.model);
+            joint_names_ = std::move(arm.joint_names);
+            n_ = model_.nv;
+            data_ = std::make_unique<pinocchio::Data>(model_);
+            RCLCPP_INFO(this->get_logger(), "Loaded URDF. nq = %d, nv = %d", model_.nq, model_.nv);
+
+            // size the state vectors and effort limits from the model
+            q_current = Eigen::VectorXd::Zero(n_);
+            qdot_current = Eigen::VectorXd::Zero(n_);
+            q_desired = Eigen::VectorXd::Zero(n_);
+            qdot_desired = Eigen::VectorXd::Zero(n_);
+            effort_limit = model_.upperEffortLimit;  // Pinocchio 4: replaces the deprecated effortLimit
+
+            // the gains are written per joint, so they must match the model's joint count
+            if (Kp.size() != n_ || Kd.size() != n_) {
+                throw std::runtime_error("Gain vectors have " + std::to_string(Kp.size()) + "/" + std::to_string(Kd.size()) + " entries, but the model has " + std::to_string(n_) + " joints.");
+            }
+
+            // subscriptions, publisher and timer are created only after the model is loaded and the vectors are sized
             joint_state_subscriber = this->create_subscription<sensor_msgs::msg::JointState>("/joint_states", 10, std::bind(&ControllerNode::jointStateCallback, this, std::placeholders::_1));
             desired_state_subscriber = this->create_subscription<sensor_msgs::msg::JointState>("/desired_joint_states", 10, std::bind(&ControllerNode::desiredStateCallback, this, std::placeholders::_1));
 
             joint_effort_publisher = this->create_publisher<std_msgs::msg::Float64MultiArray>("/effort_controller/commands", 10);
-            std::string urdf_path = resolveUrdfPath();
-            pinocchio::urdf::buildModel(urdf_path, model_);
-            data_ = std::make_unique<pinocchio::Data>(model_);
-            RCLCPP_INFO(this->get_logger(), "Loaded URDF. nq = %d, nv = %d", model_.nq, model_.nv);
 
+            // 1 kHz: the FR3 wrist (joint7 inertia ~0.002 kg m^2) is unstable under PD at 100 Hz
             control_timer = this->create_wall_timer(
-                std::chrono::milliseconds(10),
+                std::chrono::milliseconds(1),
                 std::bind(&ControllerNode::ComputeControlEffort, this)
             );
         }
@@ -44,13 +62,6 @@ class ControllerNode : public rclcpp::Node {
         // Callback function to update the measured states
 
         void jointStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg) {
-            // Check if the received message has the correct size
-
-            if (msg->position.size() != 6 || msg->velocity.size() != 6) {
-                RCLCPP_ERROR(this->get_logger(),"Received joint state message with incorrect size: q size = %zu, qdot size = %zu", msg->position.size(),msg->velocity.size()
-            );
-            return; }
-
             // reorder the message into the Pinocchio model (URDF) joint order by name
             if (!reorderToModelOrder(*msg, q_current, qdot_current)) {
                 return;
@@ -64,12 +75,6 @@ class ControllerNode : public rclcpp::Node {
 
         void desiredStateCallback(const sensor_msgs::msg::JointState::SharedPtr msg)
         {
-
-            if (msg->position.size() != 6 || msg->velocity.size() != 6) {
-                RCLCPP_ERROR(this->get_logger(),"Received joint state message with incorrect size: q size = %zu, qdot size = %zu", msg->position.size(),msg->velocity.size()
-            );
-            return; }
-            
             // reorder the message into the Pinocchio model (URDF) joint order by name
             if (!reorderToModelOrder(*msg, q_desired, qdot_desired)) {
                 return;
@@ -159,11 +164,11 @@ class ControllerNode : public rclcpp::Node {
 
             if (path.empty()) {
                 try {
-                    path = ament_index_cpp::get_package_share_directory("arm_sim") + "/urdf/ur5e.urdf";
+                    path = ament_index_cpp::get_package_share_directory("arm_sim") + "/urdf/fr3.urdf";
 
                 } catch (const std::exception &e) {
                     throw std::runtime_error(
-                        std::string("Cannot locate package 'arm_sim' to find ur5e.urdf ""(is it built and sourced?): ") + e.what());
+                        std::string("Cannot locate package 'arm_sim' to find fr3.urdf ""(is it built and sourced?): ") + e.what());
                 }
             }
             if (!std::filesystem::exists(path)) {
@@ -185,19 +190,20 @@ class ControllerNode : public rclcpp::Node {
             joint_effort_publisher->publish(effort_msg);
         }
 
-        // Reorders a JointState message into the fixed joint order used by the URDF and the effort controller.
+        // Reorders a JointState message into the model joint order (joint_names_), which the effort controller also uses.
+        // Joints in the message that are not in the model (e.g. the fingers) are ignored.
         // Returns false and logs an error if a joint is missing or any value is not finite.
 
         bool reorderToModelOrder(const sensor_msgs::msg::JointState &msg, Eigen::VectorXd &q_out, Eigen::VectorXd &qdot_out) {
-            const std::array<std::string, 6> joint_names = {"shoulder_pan_joint","shoulder_lift_joint","elbow_joint","wrist_1_joint","wrist_2_joint","wrist_3_joint"};
+            const std::vector<std::string> &joint_names = joint_names_;
 
             if (msg.name.size() != msg.position.size() || msg.name.size() != msg.velocity.size()) {
                 RCLCPP_ERROR(this->get_logger(), "JointState array sizes differ: names=%zu, positions=%zu, velocities=%zu", msg.name.size(), msg.position.size(), msg.velocity.size());
                 return false;
             }
 
-            Eigen::VectorXd q_ordered(6);
-            Eigen::VectorXd qdot_ordered(6);
+            Eigen::VectorXd q_ordered(n_);
+            Eigen::VectorXd qdot_ordered(n_);
 
             for (std::size_t i = 0; i < joint_names.size(); ++i) {
                 const auto it = std::find(msg.name.begin(), msg.name.end(), joint_names[i]);
@@ -223,14 +229,15 @@ class ControllerNode : public rclcpp::Node {
             return true;
         }
 
-        Eigen::VectorXd q_current = Eigen::VectorXd::Zero(6);
-        Eigen::VectorXd qdot_current = Eigen::VectorXd::Zero(6);
-        Eigen::VectorXd q_desired = Eigen::VectorXd::Zero(6);
-        Eigen::VectorXd qdot_desired = Eigen::VectorXd::Zero(6);
+        // sized from the model in the constructor
+        Eigen::VectorXd q_current;
+        Eigen::VectorXd qdot_current;
+        Eigen::VectorXd q_desired;
+        Eigen::VectorXd qdot_desired;
 
 
-        // per-joint effort limits, matching the URDF <limit effort=...> values
-        Eigen::VectorXd effort_limit = (Eigen::VectorXd(6) << 150.0, 150.0, 150.0, 28.0, 28.0, 28.0).finished();
+        // per-joint effort limits, taken from the model (URDF <limit effort=...>) in the constructor
+        Eigen::VectorXd effort_limit;
 
         bool has_measured_state = false;
         bool has_desired_state = false;
@@ -241,8 +248,10 @@ class ControllerNode : public rclcpp::Node {
         
         // maximum allowed age of the measured/desired state before effort output stops
         const double state_timeout = 0.2;
-        Eigen::VectorXd Kp = (Eigen::VectorXd(6) << 30.0, 30.0, 20.0, 5.0, 5.0, 2.0).finished();
-        Eigen::VectorXd Kd = (Eigen::VectorXd(6) << 10.0, 10.0, 8.0, 3.0, 3.0, 1.0).finished();
+        // FR3 gains (joint1..joint7) for the 1 kHz loop, checked for discrete-time stability with up to
+        // 5 ms of delay. joint7 is very light, so its gains are scaled to its inertia (critically damped).
+        Eigen::VectorXd Kp = (Eigen::VectorXd(7) << 200.0, 200.0, 200.0, 200.0, 50.0, 50.0, 5.0).finished();
+        Eigen::VectorXd Kd = (Eigen::VectorXd(7) << 20.0, 20.0, 20.0, 20.0, 5.0, 5.0, 0.2).finished();
 
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr joint_state_subscriber;
         rclcpp::Subscription<sensor_msgs::msg::JointState>::SharedPtr desired_state_subscriber;
@@ -251,6 +260,8 @@ class ControllerNode : public rclcpp::Node {
         rclcpp::TimerBase::SharedPtr control_timer;
         pinocchio::Model model_;
         std::unique_ptr<pinocchio::Data> data_;
+        std::vector<std::string> joint_names_;  // arm joint names in model order
+        Eigen::Index n_ = 0;                     // number of arm joints (model_.nv)
 
         
 
