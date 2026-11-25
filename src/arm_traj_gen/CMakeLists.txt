@@ -10,6 +10,7 @@ find_package(ament_index_cpp REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(pinocchio REQUIRED)
+find_package(arm_kinodynamics REQUIRED)
 
 # Quintic trajectory library
 add_library(${PROJECT_NAME}
@@ -36,6 +37,7 @@ add_executable(traj_gen_node
 target_link_libraries(traj_gen_node
   ${PROJECT_NAME}
   pinocchio::pinocchio
+  arm_kinodynamics::arm_kinodynamics
 )
 
 ament_target_dependencies(traj_gen_node
@@ -62,7 +64,7 @@ target_link_libraries(test_joint_limits
 )
 
 target_compile_definitions(test_joint_limits PRIVATE
-  UR5E_URDF_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../arm_sim/urdf/ur5e.urdf"
+  FR3_URDF_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../arm_sim/urdf/fr3.urdf"
 )
 
 # Integration test: fake /joint_states -> traj_gen_node -> /desired_joint_states (isolated domain)
