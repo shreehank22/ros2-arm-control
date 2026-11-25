@@ -14,6 +14,7 @@ add_library(${PROJECT_NAME}
   src/dynamics.cpp
   src/kinematics.cpp
   src/arm_model.cpp
+  
 )
 
 target_include_directories(${PROJECT_NAME}
