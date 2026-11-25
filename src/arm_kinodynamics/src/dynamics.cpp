@@ -1,14 +1,14 @@
 #include "arm_kinodynamics/dynamics.hpp"
+#include "arm_kinodynamics/arm_model.hpp"
 
-#include <pinocchio/parsers/urdf.hpp>
 #include <pinocchio/algorithm/crba.hpp>
 #include <pinocchio/algorithm/rnea.hpp>
 #include <iostream>
 
 RobotDynamics::RobotDynamics(const std::string& urdf_path)
 {
-    // Load the urdf model
-    pinocchio::urdf::buildModel(urdf_path, model_);
+    // Load the arm model: FR3 URDF with the finger joints locked (7 DoF, hand mass kept)
+    model_ = loadArmModel(urdf_path, {"fr3_finger_joint1", "fr3_finger_joint2"}).model;
     data_=pinocchio::Data(model_);
 }
 
