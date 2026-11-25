@@ -3,13 +3,15 @@
 <package format="3">
   <name>arm_control</name>
   <version>0.0.1</version>
-  <description>PD + gravity-compensation controller for UR5e</description>
+  <description>PD + gravity-compensation controller for the Franka FR3</description>
   <maintainer email="shreehan1912@gmail.com">Shreehan Kate</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>ament_index_cpp</depend>
+  <depend>arm_kinodynamics</depend>
+  <depend>pinocchio</depend>
   <depend>rclcpp</depend>
   <exec_depend>arm_sim</exec_depend>
   <depend>sensor_msgs</depend>
