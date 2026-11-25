@@ -14,7 +14,6 @@ add_library(${PROJECT_NAME}
   src/dynamics.cpp
   src/kinematics.cpp
   src/arm_model.cpp
-  
 )
 
 target_include_directories(${PROJECT_NAME}
@@ -38,6 +37,10 @@ ament_add_gtest(test_kinodynamics
 
 target_link_libraries(test_kinodynamics
   ${PROJECT_NAME}
+)
+
+target_compile_definitions(test_kinodynamics PRIVATE
+  FR3_URDF_PATH="${CMAKE_CURRENT_SOURCE_DIR}/../arm_sim/urdf/fr3.urdf"
 )
 
 ament_add_gtest(test_arm_model
