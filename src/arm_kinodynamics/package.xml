@@ -7,7 +7,7 @@
   <version>0.0.1</version>
 
   <description>
-    Pinocchio-based kinematics and dynamics library for the UR5e robot.
+    Pinocchio-based kinematics and dynamics library for the Franka FR3 arm.
   </description>
 
   <maintainer email="shreehan1912@gmail.com">
