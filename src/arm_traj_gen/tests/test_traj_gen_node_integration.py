@@ -14,10 +14,15 @@ import rclpy  # noqa: E402
 from rclpy.node import Node  # noqa: E402
 from sensor_msgs.msg import JointState  # noqa: E402
 
-ORDER = ['elbow_joint', 'shoulder_lift_joint', 'shoulder_pan_joint',
-         'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
-HOME = {'shoulder_pan_joint': 0.0, 'shoulder_lift_joint': -1.571, 'elbow_joint': 0.0,
-        'wrist_1_joint': -1.571, 'wrist_2_joint': 0.0, 'wrist_3_joint': 0.0}
+# /joint_states order as a simulator might send it: shuffled, with the finger joints included
+ORDER = ['fr3_joint4', 'fr3_joint2', 'fr3_joint1', 'fr3_finger_joint1', 'fr3_joint5',
+         'fr3_joint6', 'fr3_joint7', 'fr3_joint3', 'fr3_finger_joint2']
+# traj_gen_node publishes only the arm joints, in model order
+ARM_JOINTS = ['fr3_joint1', 'fr3_joint2', 'fr3_joint3', 'fr3_joint4',
+              'fr3_joint5', 'fr3_joint6', 'fr3_joint7']
+HOME = {'fr3_joint1': 0.0, 'fr3_joint2': -0.7854, 'fr3_joint3': 0.0, 'fr3_joint4': -2.3562,
+        'fr3_joint5': 0.0, 'fr3_joint6': 1.5708, 'fr3_joint7': 0.7854,
+        'fr3_finger_joint1': 0.0, 'fr3_finger_joint2': 0.0}
 NODE = os.environ['TRAJ_GEN_NODE']
 
 
@@ -59,25 +64,25 @@ def pose(**overrides):
 
 
 class TestTrajGenNode(unittest.TestCase):
-    def test_valid_home_publishes_pan_trajectory(self):
+    def test_valid_home_publishes_joint1_trajectory(self):
         names, pos = pose()
         got, log, alive = run_node(names, pos, 8.5)
         self.assertTrue(alive)
-        self.assertIn('Loaded limits for 6 joints', log)
+        self.assertIn('Loaded limits for 7 joints', log)
         self.assertGreater(len(got), 100)
         t0 = got[0][0]
-        pan = ORDER.index('shoulder_pan_joint')
+        joint1 = ARM_JOINTS.index('fr3_joint1')
         first, last = got[0][1], got[-1][1]
-        self.assertEqual(list(first.name), ORDER)
+        self.assertEqual(list(first.name), ARM_JOINTS)
         for n, p in zip(first.name, first.position):
             self.assertAlmostEqual(p, HOME[n], delta=1e-3)
         for i, n in enumerate(last.name):
-            self.assertAlmostEqual(last.position[i], HOME[n] + (0.1 if i == pan else 0.0),
+            self.assertAlmostEqual(last.position[i], HOME[n] + (0.1 if i == joint1 else 0.0),
                                    delta=1e-6)
             self.assertAlmostEqual(last.velocity[i], 0.0, delta=1e-6)
         mid = min(got, key=lambda g: abs((g[0] - t0) - 2.5))[1]
-        self.assertAlmostEqual(mid.position[pan], 0.05, delta=2e-3)
-        self.assertAlmostEqual(mid.velocity[pan], 0.0375, delta=1e-3)
+        self.assertAlmostEqual(mid.position[joint1], 0.05, delta=2e-3)
+        self.assertAlmostEqual(mid.velocity[joint1], 0.0375, delta=1e-3)
 
     def _assert_rejected(self, names, pos, expected_log):
         got, log, alive = run_node(names, pos, 3.0)
@@ -86,17 +91,21 @@ class TestTrajGenNode(unittest.TestCase):
         self.assertIn(expected_log, log)
 
     def test_start_beyond_limit_is_rejected(self):
-        self._assert_rejected(*pose(shoulder_pan_joint=6.4), 'outside limits')
+        self._assert_rejected(*pose(fr3_joint1=3.0), 'outside limits')
 
     def test_target_beyond_limit_is_rejected(self):
-        self._assert_rejected(*pose(shoulder_pan_joint=6.2), 'shoulder_pan_joint target')
+        # 2.85 is valid, but the +0.1 target exceeds the 2.9007 limit
+        self._assert_rejected(*pose(fr3_joint1=2.85), 'fr3_joint1 target')
 
-    def test_elbow_tighter_limit_is_rejected(self):
-        self._assert_rejected(*pose(elbow_joint=3.2), 'elbow_joint start')
+    def test_joint4_asymmetric_limit_is_rejected(self):
+        # joint4 range is [-3.077, -0.1169], so 0.0 is out of range
+        self._assert_rejected(*pose(fr3_joint4=0.0), 'fr3_joint4 start')
 
     def test_unknown_joint_is_rejected(self):
-        names = ORDER[:5] + ['bogus_joint']
-        self._assert_rejected(names, [HOME[n] for n in ORDER[:5]] + [0.0], 'bogus_joint')
+        # an arm joint replaced by an unknown name: the arm joint is then missing
+        names, pos = pose()
+        names = ['bogus_joint' if n == 'fr3_joint7' else n for n in names]
+        self._assert_rejected(names, pos, 'fr3_joint7 not found')
 
     def test_non_finite_is_rejected(self):
         names, pos = pose()
