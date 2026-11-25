@@ -41,14 +41,14 @@ TEST(ArmModelTest, KeepsEffortLimits)
 {
     const ArmModel arm = loadArmModel(FR3_URDF_PATH, kLocked);
 
-    ASSERT_EQ(arm.model.effortLimit.size(), 7);
+    ASSERT_EQ(arm.model.upperEffortLimit.size(), 7);
     for (int i = 0; i < 4; ++i)
     {
-        EXPECT_DOUBLE_EQ(arm.model.effortLimit[i], 87.0) << "joint index " << i;
+        EXPECT_DOUBLE_EQ(arm.model.upperEffortLimit[i], 87.0) << "joint index " << i;
     }
     for (int i = 4; i < 7; ++i)
     {
-        EXPECT_DOUBLE_EQ(arm.model.effortLimit[i], 12.0) << "joint index " << i;
+        EXPECT_DOUBLE_EQ(arm.model.upperEffortLimit[i], 12.0) << "joint index " << i;
     }
 }
 
