@@ -4,13 +4,12 @@ from ament_index_python.packages import get_package_share_directory
 import xacro, os
 
 def generate_launch_description():
+    # same FR3 URDF the simulation uses; xacro resolves its $(find arm_control) path
     xacro_file = os.path.join(
-        get_package_share_directory('ur_description'), 'urdf', 'ur.urdf.xacro'
+        get_package_share_directory('arm_sim'), 'urdf', 'fr3.urdf'
     )
     robot_description = {
-        'robot_description': xacro.process_file(
-            xacro_file, mappings={'name': 'ur5e', 'ur_type': 'ur5e'}
-        ).toxml()
+        'robot_description': xacro.process_file(xacro_file).toxml()
     }
 
     return LaunchDescription([
