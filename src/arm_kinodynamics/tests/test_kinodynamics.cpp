@@ -13,10 +13,10 @@
 // test scripts for dynamics and kinematics of the robot arm
 
 TEST(RobotDynamicsTest, TestMassMatrix){
-    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    std::string urdf_path = FR3_URDF_PATH;
     RobotDynamics robot_dynamics(urdf_path);
-    Eigen::VectorXd q(6);
-    q << 0.0, -M_PI / 2.0, 0.0, -M_PI / 2.0, 0.0, 0.0;
+    Eigen::VectorXd q(7);
+    q << 0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854;
 
     Eigen::MatrixXd mass_matrix = robot_dynamics.getMassMatrix(q);
 
@@ -37,13 +37,13 @@ TEST(RobotDynamicsTest, TestMassMatrix){
 }
 
 TEST(RobotDynamicsTest, TestCoriolisAndGravity){
-    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    std::string urdf_path = FR3_URDF_PATH;
     RobotDynamics robot_dynamics(urdf_path);
-    Eigen::VectorXd q(6);
-    q << 0.2, -1.0, 0.4, -0.8, 0.3, 0.2;
-    Eigen::VectorXd dq(6);
-    dq << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6;
-    Eigen::VectorXd zero_velocity(6);
+    Eigen::VectorXd q(7);
+    q << 0.2, -0.5, 0.3, -2.0, 0.3, 1.8, 0.5;
+    Eigen::VectorXd dq(7);
+    dq << 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7;
+    Eigen::VectorXd zero_velocity(7);
     zero_velocity.setZero();
 
     Eigen::VectorXd coriolis = robot_dynamics.getCoriolis(q, dq);
@@ -70,11 +70,11 @@ TEST(RobotDynamicsTest, TestCoriolisAndGravity){
 
 TEST(RobotKinematicsTest, TestJacobian)
 {
-    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    std::string urdf_path = FR3_URDF_PATH;
     RobotKinematics robot_kinematics(urdf_path);
 
-    Eigen::VectorXd q(6);
-    q << 0.0, -M_PI / 2.0, 0.0, -M_PI / 2.0, 0.0, 0.0;
+    Eigen::VectorXd q(7);
+    q << 0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854;
 
     const double epsilon = 1e-6;
 
@@ -83,15 +83,15 @@ TEST(RobotKinematicsTest, TestJacobian)
 
     // Check dimensions
     EXPECT_EQ(jacobian.rows(), 6);
-    EXPECT_EQ(jacobian.cols(), 6);
+    EXPECT_EQ(jacobian.cols(), 7);
 
     // Check finite values
     EXPECT_TRUE(jacobian.allFinite());
 
     // Numerical linear-velocity Jacobian
-    Eigen::MatrixXd numerical_jacobian(3, 6);
+    Eigen::MatrixXd numerical_jacobian(3, 7);
 
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 7; ++i)
     {
         Eigen::VectorXd q_plus = q;
         Eigen::VectorXd q_minus = q;
@@ -113,20 +113,20 @@ TEST(RobotKinematicsTest, TestJacobian)
 
 TEST(RobotKinematicsTest, TestFKIK)
 {
-    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    std::string urdf_path = FR3_URDF_PATH;
     RobotKinematics robot_kinematics(urdf_path);
 
     // Fixed target configuration
-    Eigen::VectorXd q_test(6);
-    q_test << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
+    Eigen::VectorXd q_test(7);
+    q_test << 0.3, -0.3, 0.2, -1.8, 0.1, 1.6, 0.4;
 
     // Forward kinematics -> target pose
     Eigen::Vector3d p_test = robot_kinematics.getPosition(q_test);
     Eigen::Matrix3d R_test = robot_kinematics.getRotation(q_test);
 
     // Deliberately different initial guess
-    Eigen::VectorXd q_initial(6);
-    q_initial << 0.0, -M_PI / 2.0, 0.0, -M_PI / 2.0, 0.0, 0.0;
+    Eigen::VectorXd q_initial(7);
+    q_initial << 0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854;
 
     // Inverse kinematics: solve for q_test's pose starting from q_initial
     IKResult ik_result = robot_kinematics.solveIK(q_initial, p_test, R_test);
@@ -155,7 +155,7 @@ TEST(RobotKinematicsTest, TestFKIK)
 
 TEST(RobotKinematicsTest, IKMultipleConfigurations)
 {
-    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    std::string urdf_path = FR3_URDF_PATH;
     RobotKinematics robot_kinematics(urdf_path);
 
     struct Config { Eigen::VectorXd q_test, q_initial; std::string name; };
@@ -163,33 +163,33 @@ TEST(RobotKinematicsTest, IKMultipleConfigurations)
     std::vector<Config> configs;
 
     Config c1; c1.name = "MildBend";
-    c1.q_test = (Eigen::VectorXd(6) << 0.3, -1.2, 0.8, -1.0, 0.5, 0.2).finished();
-    c1.q_initial = (Eigen::VectorXd(6) << 0.0, -1.5, 0.5, -1.0, 0.0, 0.0).finished();
+    c1.q_test = (Eigen::VectorXd(7) << 0.3, -0.5, 0.2, -2.0, 0.1, 1.6, 0.6).finished();
+    c1.q_initial = (Eigen::VectorXd(7) << 0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854).finished();
     configs.push_back(c1);
 
     Config c2; c2.name = "ElbowBentWristRotated";
-    c2.q_test = (Eigen::VectorXd(6) << -0.5, -0.8, 1.8, -2.0, -0.7, 1.0).finished();
-    c2.q_initial = (Eigen::VectorXd(6) << 0.0, -1.0, 1.0, -1.5, 0.0, 0.0).finished();
+    c2.q_test = (Eigen::VectorXd(7) << -0.5, 0.2, 0.4, -2.6, -0.7, 2.2, -1.0).finished();
+    c2.q_initial = (Eigen::VectorXd(7) << 0.0, -0.3, 0.0, -2.2, 0.0, 1.9, 0.8).finished();
     configs.push_back(c2);
 
     Config c3; c3.name = "NearFullExtension";
-    c3.q_test = (Eigen::VectorXd(6) << 0.0, -1.57, 0.05, -1.57, 0.0, 0.0).finished();
-    c3.q_initial = (Eigen::VectorXd(6) << 0.5, -1.0, 0.5, -1.0, 0.5, 0.5).finished();
+    c3.q_test = (Eigen::VectorXd(7) << 0.0, 0.6, 0.0, -0.4, 0.0, 1.0, 0.8).finished();
+    c3.q_initial = (Eigen::VectorXd(7) << 0.5, 0.2, 0.3, -1.0, 0.3, 1.4, 0.3).finished();
     configs.push_back(c3);
 
-    Config c4; c4.name = "WristAxesAligned";
-    c4.q_test = (Eigen::VectorXd(6) << 0.2, -1.0, 1.0, -1.57, 0.0, 0.3).finished();
-    c4.q_initial = (Eigen::VectorXd(6) << -0.3, -1.3, 0.6, -0.8, 0.4, -0.2).finished();
+    Config c4; c4.name = "Joint6NearLowerLimit";
+    c4.q_test = (Eigen::VectorXd(7) << 0.2, -0.4, 0.3, -2.0, 0.4, 0.6, 0.3).finished();
+    c4.q_initial = (Eigen::VectorXd(7) << -0.3, -0.6, 0.6, -1.6, 0.4, 1.2, -0.2).finished();
     configs.push_back(c4);
 
     Config c5; c5.name = "LargeExcursion";
-    c5.q_test = (Eigen::VectorXd(6) << 1.5, -2.0, 1.5, -1.0, 1.0, -1.0).finished();
-    c5.q_initial = (Eigen::VectorXd(6) << -1.5, -0.5, 0.2, -2.0, -1.0, 1.0).finished();
+    c5.q_test = (Eigen::VectorXd(7) << 1.5, -1.0, 1.2, -2.5, 1.0, 2.5, -1.0).finished();
+    c5.q_initial = (Eigen::VectorXd(7) << -1.5, 0.3, -0.5, -1.5, -1.0, 1.2, 1.0).finished();
     configs.push_back(c5);
 
-    Config c6; c6.name = "Zero";
-    c6.q_test = (Eigen::VectorXd(6) << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0).finished();
-    c6.q_initial = (Eigen::VectorXd(6) << 0.0, -M_PI / 2.0, 0.0, -M_PI / 2.0, 0.0, 0.0).finished();
+    Config c6; c6.name = "Home";
+    c6.q_test = (Eigen::VectorXd(7) << 0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854).finished();
+    c6.q_initial = (Eigen::VectorXd(7) << 0.3, -0.3, 0.2, -1.8, 0.2, 1.4, 0.2).finished();
     configs.push_back(c6);
 
     constexpr double epsilon_p = 1e-4;
@@ -225,15 +225,15 @@ TEST(RobotKinematicsTest, IKMultipleConfigurations)
 
 TEST (RobotKinematicsTest, TestJacobianAtMultipleConfigurations)
 {
-    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    std::string urdf_path = FR3_URDF_PATH;
     RobotKinematics robot_kinematics(urdf_path);
 
     std::vector<Eigen::VectorXd> test_configs = {
-        (Eigen::VectorXd(6) << 0.0, -M_PI / 2.0, 0.0, -M_PI / 2.0, 0.0, 0.0).finished(),
-        (Eigen::VectorXd(6) << 0.3, -1.2, 0.8, -1.0, 0.5, 0.2).finished(),
-        (Eigen::VectorXd(6) << -0.5, -0.8, 1.8, -2.0, -0.7, 1.0).finished(),
-        (Eigen::VectorXd(6) << 1.5, -2.0, 1.5, -1.0, 1.0, -1.0).finished(),
-        (Eigen::VectorXd(6) << 0.2, -1.0, 1.0, -1.57, 0.0, 0.3).finished()
+        (Eigen::VectorXd(7) << 0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854).finished(),
+        (Eigen::VectorXd(7) << 0.3, -0.5, 0.2, -2.0, 0.1, 1.6, 0.6).finished(),
+        (Eigen::VectorXd(7) << -0.5, 0.2, 0.4, -2.6, -0.7, 2.2, -1.0).finished(),
+        (Eigen::VectorXd(7) << 1.5, -1.0, 1.2, -2.5, 1.0, 2.5, -1.0).finished(),
+        (Eigen::VectorXd(7) << 0.2, -0.4, 0.3, -2.0, 0.4, 0.6, 0.3).finished()
     };
 
     const double epsilon = 1e-6;
@@ -242,11 +242,11 @@ TEST (RobotKinematicsTest, TestJacobianAtMultipleConfigurations)
     {
         Eigen::MatrixXd jacobian = robot_kinematics.getJacobian(q);
         EXPECT_EQ(jacobian.rows(), 6);
-        EXPECT_EQ(jacobian.cols(), 6);
+        EXPECT_EQ(jacobian.cols(), 7);
         EXPECT_TRUE(jacobian.allFinite());
 
-        Eigen::MatrixXd numerical_jacobian(3, 6);
-        for (int i = 0; i < 6; ++i)
+        Eigen::MatrixXd numerical_jacobian(3, 7);
+        for (int i = 0; i < 7; ++i)
         {
             Eigen::VectorXd q_plus = q;
             Eigen::VectorXd q_minus = q;
@@ -266,20 +266,20 @@ TEST (RobotKinematicsTest, TestJacobianAtMultipleConfigurations)
 
 TEST (RobotKinematicsTest, IKRoundTripMultipleConfigurations)
 {
-    std::string urdf_path = "/home/shreehank1906/ros2-arm-control/src/arm_sim/urdf/ur5e.urdf";
+    std::string urdf_path = FR3_URDF_PATH;
     RobotKinematics robot_kinematics(urdf_path);
 
-    Eigen::VectorXd q_test(6);
-    q_test << 0.0, -M_PI / 2.0, 0.0, -M_PI / 2.0, 0.0, 0.0;
+    Eigen::VectorXd q_test(7);
+    q_test << 0.0, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854;
 
     Eigen::Vector3d p_test = robot_kinematics.getPosition(q_test);
     Eigen::Matrix3d R_test = robot_kinematics.getRotation(q_test);
 
     std::vector<Eigen::VectorXd> initial_guesses = {
-        (Eigen::VectorXd(6) << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0).finished(),
-        (Eigen::VectorXd(6) << 1.5, -1.0, 1.5, -0.5, 1.0, -1.0).finished(),
-        (Eigen::VectorXd(6) << -1.0, -1.8, 0.3, -1.2, -0.8, 0.5).finished(),
-        (Eigen::VectorXd(6) << 0.5, -0.3, 2.0, -2.0, 0.2, 1.5).finished()
+        (Eigen::VectorXd(7) << 0.0, 0.0, 0.0, -1.5, 0.0, 1.5, 0.0).finished(),
+        (Eigen::VectorXd(7) << 1.5, -1.0, 1.5, -0.5, 1.0, 2.0, -1.0).finished(),
+        (Eigen::VectorXd(7) << -1.0, -1.5, 0.3, -2.5, -0.8, 3.0, 0.5).finished(),
+        (Eigen::VectorXd(7) << 0.5, 0.5, 2.0, -2.0, 0.2, 1.0, 1.5).finished()
     };
 
     const double epsilon_p = 1e-4;
@@ -307,6 +307,31 @@ TEST (RobotKinematicsTest, IKRoundTripMultipleConfigurations)
 
         EXPECT_LT(position_error, epsilon_p) << "Position error too large for initial guess index: " << i;
         EXPECT_LT(rotation_error, epsilon_R) << "Rotation error too large for initial guess index: " << i;
+    }
+}
+
+// logSO3 near pi: log must invert exp for rotations close to 180 degrees about any axis,
+// including axes with mixed-sign components (the case the old sign logic got wrong)
+TEST(RobotKinematicsTest, LogSO3NearPi)
+{
+    std::string urdf_path = FR3_URDF_PATH;
+    RobotKinematics robot_kinematics(urdf_path);
+
+    const std::vector<Eigen::Vector3d> axes = {
+        Eigen::Vector3d(1, 1, -1).normalized(), Eigen::Vector3d(1, -1, 1).normalized(),
+        Eigen::Vector3d(-1, 1, 1).normalized(), Eigen::Vector3d(0, 1, -1).normalized(),
+        Eigen::Vector3d(1, 0, 0), Eigen::Vector3d(0.3, -0.5, 0.8).normalized()};
+
+    for (const auto& axis : axes)
+    {
+        for (const double angle : {M_PI, M_PI - 5e-5})
+        {
+            const Eigen::Matrix3d R = Eigen::AngleAxisd(angle, axis).toRotationMatrix();
+            const Eigen::Vector3d w = robot_kinematics.logSO3(R);
+            EXPECT_NEAR(w.norm(), angle, 1e-6) << "axis " << axis.transpose();
+            const Eigen::Matrix3d R_back = Eigen::AngleAxisd(w.norm(), w.normalized()).toRotationMatrix();
+            EXPECT_TRUE(R_back.isApprox(R, 1e-6)) << "axis " << axis.transpose() << " angle " << angle;
+        }
     }
 }
 
