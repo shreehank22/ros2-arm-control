@@ -9,6 +9,7 @@ A ROS 2 Jazzy simulation and control stack for a Franka FR3 arm with the Franka 
 - `arm_traj_gen`: quintic joint trajectory generator (`traj_gen_node`) with URDF joint-limit checks
 - `arm_kinodynamics`: Pinocchio library: arm model loading, kinematics, Jacobian and dynamics
 - `arm_bringup`: launch file for the full system
+- `arm_description`: RViz display launch
 
 ## How it fits together
 
@@ -77,6 +78,22 @@ Then start the nodes in separate terminals, controller first so the arm is held 
 ```bash
 ros2 run arm_control controller_node
 ros2 run arm_traj_gen traj_gen_node
+```
+
+### Visualize in RViz
+
+With the simulation running (it already publishes `/robot_description` and TF):
+
+```bash
+ros2 run rviz2 rviz2
+```
+
+In RViz, set **Fixed Frame** to `world` and add a **RobotModel** display (Description Topic: `/robot_description`) and a **TF** display.
+
+Without the simulation, `display.launch.py` starts `robot_state_publisher` with the FR3 URDF and RViz. With no joint states, only the fixed links get transforms:
+
+```bash
+ros2 launch arm_description display.launch.py
 ```
 
 ## Tests
