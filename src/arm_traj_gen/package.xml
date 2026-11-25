@@ -7,7 +7,7 @@
   <version>0.0.1</version>
 
   <description>
-    Cartesian and joint trajectory generation with DLS inverse kinematics for UR5e
+    Cartesian and joint trajectory generation with DLS inverse kinematics for the Franka FR3
   </description>
 
   <maintainer email="shreehan1912@gmail.com">
@@ -19,6 +19,7 @@
   <buildtool_depend>ament_cmake</buildtool_depend>
 
   <depend>ament_index_cpp</depend>
+  <depend>arm_kinodynamics</depend>
   <depend>rclcpp</depend>
   <exec_depend>arm_sim</exec_depend>
   <depend>sensor_msgs</depend>
