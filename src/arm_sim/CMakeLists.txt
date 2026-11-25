@@ -21,6 +21,11 @@ install(
 )
 
 install(
+  DIRECTORY meshes/
+  DESTINATION share/${PROJECT_NAME}/meshes
+)
+
+install(
   DIRECTORY worlds/
   DESTINATION share/${PROJECT_NAME}/worlds
 )
