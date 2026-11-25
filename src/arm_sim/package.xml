@@ -3,15 +3,21 @@
 <package format="3">
   <name>arm_sim</name>
   <version>0.0.1</version>
-  <description>Pinocchio-based dynamics integrator for UR5e</description>
+  <description>Gazebo Sim simulation of the Franka FR3 arm: URDF, meshes, world and launch</description>
   <maintainer email="shreehan1912@gmail.com">Shreehan Kate</maintainer>
   <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <depend>rclcpp</depend>
-  <depend>sensor_msgs</depend>
-  <depend>std_msgs</depend>
+  <!-- sim.launch.py -->
+  <exec_depend>controller_manager</exec_depend>
+  <exec_depend>gz_ros2_control</exec_depend>
+  <exec_depend>joint_state_broadcaster</exec_depend>
+  <exec_depend>forward_command_controller</exec_depend>
+  <exec_depend>robot_state_publisher</exec_depend>
+  <exec_depend>ros_gz_bridge</exec_depend>
+  <exec_depend>ros_gz_sim</exec_depend>
+  <exec_depend>xacro</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
