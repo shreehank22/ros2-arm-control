@@ -130,11 +130,19 @@ def generate_launch_description():
         output="screen",
     )
 
-    # start the effort controller once the joint state broadcaster is up
+    # gripper action controller for the Franka Hand (/hand_controller/gripper_cmd)
+    hand_controller = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["hand_controller", "--controller-manager-timeout", "60"],
+        output="screen",
+    )
+
+    # start the effort and hand controllers once the joint state broadcaster is up
     effort_controller_after_broadcaster = RegisterEventHandler(
         OnProcessExit(
             target_action=joint_state_broadcaster,
-            on_exit=[effort_controller],
+            on_exit=[effort_controller, hand_controller],
         )
     )
 
