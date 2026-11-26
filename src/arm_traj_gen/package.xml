@@ -24,6 +24,9 @@
   <exec_depend>arm_sim</exec_depend>
   <depend>sensor_msgs</depend>
   <depend>pinocchio</depend>
+  <depend>control_msgs</depend>
+  <depend>trajectory_msgs</depend>
+  <depend>rclcpp_action</depend>
 
   <test_depend>ament_cmake_gtest</test_depend>
   <test_depend>ament_cmake_pytest</test_depend>
