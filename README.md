@@ -4,7 +4,7 @@ A ROS 2 Jazzy simulation and control stack for a Franka FR3 arm with the Franka 
 
 ## Packages
 
-- `arm_sim`: FR3 + hand URDF and meshes, Gazebo world, simulation launch
+- `arm_sim`: FR3 + hand URDF and meshes, Gazebo world, simulation launch (spawns the arm's effort controller and the hand's gripper controller)
 - `arm_control`: PD + gravity-compensation controller (`controller_node`) and the `ros2_control` controller configuration
 - `arm_traj_gen`: quintic joint trajectory generator (`traj_gen_node`) with URDF joint-limit checks, and the `FollowJointTrajectory` action server (`trajectory_action_server`) that executes MoveIt trajectories
 - `fr3_moveit_config`: MoveIt configuration for the FR3 (SRDF, KDL kinematics, joint limits, controller config) and `moveit_sim.launch.py` (`move_group` + RViz)
@@ -110,6 +110,18 @@ ros2 action send_goal --feedback /fr3_arm_controller/follow_joint_trajectory con
 
 The platform and the ground show in RViz as green boxes (MotionPlanning → Scene Geometry). A goal inside them turns the arm red and can't be planned to.
 
+**Hand:** in the MotionPlanning panel, set Planning Group to `hand`, choose Goal State `open` or `closed`, then **Plan & Execute**. MoveIt sends the final finger position to `hand_controller`, a `parallel_gripper_action_controller/GripperActionController` on `fr3_finger_joint1` with the `control_msgs/action/ParallelGripperCommand` action on `/hand_controller/gripper_cmd`.
+
+- `fr3_finger_joint2` mimics finger 1. Gazebo's physics engine can't apply the URDF mimic, so `gz_ros2_control` copies finger 1's command to finger 2.
+- The position is finger 1 in metres: 0 is closed and 0.04 is open, so the opening between the fingers is twice the position.
+
+The gripper can also be commanded directly, but see the known issue below:
+
+```bash
+ros2 action send_goal /hand_controller/gripper_cmd control_msgs/action/ParallelGripperCommand \
+  "{command: {name: [fr3_finger_joint1], position: [0.04]}}"
+```
+
 Don't run `traj_gen_node` at the same time: both nodes publish `/desired_joint_states`.
 
 ### Simulation only
@@ -192,6 +204,10 @@ ros2 action info /fr3_arm_controller/follow_joint_trajectory   # MoveIt executio
 - **Execute fails with `Action client not connected to action server: fr3_arm_controller/follow_joint_trajectory`**: `trajectory_action_server` isn't running, for example when `moveit_sim.launch.py` was started on its own. Use `moveit_system.launch.py`.
 - **`No 3D sensor plugin(s) defined for octomap updates`**: harmless; there's no depth sensor.
 - **`move_group` prints a stack trace or `exit code -11` on Ctrl+C**: a known MoveIt crash on exit in Jazzy, after it has already stopped. Harmless.
+- **Known issue: the gripper sometimes stops moving in simulation.** Open and close through MoveIt (`hand` group, `open`/`closed`) worked in every repeated test (6/6). But:
+  - After a *direct* gripper goal of exactly `0.0`, which drives the fingers into their joint limit where they touch, later goals are accepted but the fingers don't move. MoveIt then reports `TIMED_OUT`, and only restarting the simulation recovers.
+  - With `sim.launch.py` alone, where nothing holds the arm, opening works but closing reports `stalled`.
+  - The cause is in how Gazebo handles the position-controlled, mimicking, touching fingers. It hasn't been fixed yet. Until then, command the hand through MoveIt, or keep direct close goals slightly above 0 (for example `0.001`).
 
 ## Robot model
 
