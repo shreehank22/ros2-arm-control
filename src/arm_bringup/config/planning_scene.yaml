@@ -1,0 +1,8 @@
+planning_scene_setup:
+  ros__parameters:
+    frame_id: world                          # MoveIt planning frame = robot base (URDF root)
+    # must match arm_sim/worlds/fr3_world.sdf; the robot is spawned at z = 0.4 in Gazebo
+    platform_size: [1.2, 1.2, 0.4]
+    platform_position: [0.0, 0.0, -0.205]    # top 5 mm below fr3_link0, which sits at z = 0
+    ground_size: [4.0, 4.0, 0.02]
+    ground_position: [0.0, 0.0, -0.41]       # top at the ground plane (z = -0.4)
