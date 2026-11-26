@@ -1,0 +1,300 @@
+{
+  "scenario_a_moveit_system": [
+    {
+      "step": 1,
+      "kind": "moveit",
+      "target": 0.04,
+      "label": "MoveIt: hand -> open",
+      "t0": 9.185,
+      "t1": 11.655,
+      "result": "SUCCESS",
+      "finger_before_mm": 0.0,
+      "finger_after_mm": 39.06,
+      "moved": true,
+      "expected_motion": true
+    },
+    {
+      "step": 2,
+      "kind": "moveit",
+      "target": 0.0,
+      "label": "MoveIt: hand -> closed",
+      "t0": 11.655,
+      "t1": 14.11,
+      "result": "SUCCESS",
+      "finger_before_mm": 39.06,
+      "finger_after_mm": 0.99,
+      "moved": true,
+      "expected_motion": true
+    },
+    {
+      "step": 3,
+      "kind": "direct",
+      "target": 0.04,
+      "label": "Direct gripper goal: 0.04 (open)",
+      "t0": 14.11,
+      "t1": 16.55,
+      "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+      "finger_before_mm": 0.99,
+      "finger_after_mm": 40.0,
+      "moved": true,
+      "expected_motion": true
+    },
+    {
+      "step": 4,
+      "kind": "direct",
+      "target": 0.0,
+      "label": "Direct gripper goal: 0.0 (close to the joint limit)",
+      "t0": 16.55,
+      "t1": 19.013,
+      "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+      "finger_before_mm": 40.0,
+      "finger_after_mm": -0.0,
+      "moved": true,
+      "expected_motion": true
+    },
+    {
+      "step": 5,
+      "kind": "moveit",
+      "target": 0.04,
+      "label": "MoveIt: hand -> open (after the direct 0.0)",
+      "t0": 19.013,
+      "t1": 22.298000000000002,
+      "result": "TIMED_OUT",
+      "finger_before_mm": -0.0,
+      "finger_after_mm": -0.0,
+      "moved": false,
+      "expected_motion": true
+    },
+    {
+      "step": 6,
+      "kind": "direct",
+      "target": 0.04,
+      "label": "Direct gripper goal: 0.04 (open)",
+      "t0": 22.298000000000002,
+      "t1": 25.614,
+      "result": "ABORTED (reached_goal=False, stalled=True)",
+      "finger_before_mm": -0.0,
+      "finger_after_mm": -0.0,
+      "moved": false,
+      "expected_motion": true
+    }
+  ],
+  "scenario_b_sim_only": [
+    [
+      {
+        "step": 1,
+        "kind": "direct",
+        "target": 0.04,
+        "label": "direct 0.04",
+        "t0": 3.942,
+        "t1": 5.195,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 0.0,
+        "finger_after_mm": 40.0,
+        "moved": true,
+        "expected_motion": true
+      },
+      {
+        "step": 2,
+        "kind": "direct",
+        "target": 0.0,
+        "label": "direct 0.0",
+        "t0": 5.195,
+        "t1": 6.745,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 40.0,
+        "finger_after_mm": 0.0,
+        "moved": true,
+        "expected_motion": true
+      },
+      {
+        "step": 3,
+        "kind": "direct",
+        "target": 0.001,
+        "label": "direct 0.001",
+        "t0": 6.745,
+        "t1": 7.981,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 0.0,
+        "finger_after_mm": 1.0,
+        "moved": false,
+        "expected_motion": false
+      },
+      {
+        "step": 4,
+        "kind": "direct",
+        "target": 0.04,
+        "label": "direct 0.04",
+        "t0": 7.981,
+        "t1": 9.153,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 1.0,
+        "finger_after_mm": 40.0,
+        "moved": true,
+        "expected_motion": true
+      }
+    ],
+    [
+      {
+        "step": 1,
+        "kind": "direct",
+        "target": 0.04,
+        "label": "direct 0.04",
+        "t0": 4.286,
+        "t1": 5.488,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 0.0,
+        "finger_after_mm": 40.0,
+        "moved": true,
+        "expected_motion": true
+      },
+      {
+        "step": 2,
+        "kind": "direct",
+        "target": 0.0,
+        "label": "direct 0.0",
+        "t0": 5.488,
+        "t1": 6.721,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 40.0,
+        "finger_after_mm": 0.0,
+        "moved": true,
+        "expected_motion": true
+      },
+      {
+        "step": 3,
+        "kind": "direct",
+        "target": 0.001,
+        "label": "direct 0.001",
+        "t0": 6.721,
+        "t1": 7.811,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 0.0,
+        "finger_after_mm": 1.0,
+        "moved": false,
+        "expected_motion": false
+      },
+      {
+        "step": 4,
+        "kind": "direct",
+        "target": 0.04,
+        "label": "direct 0.04",
+        "t0": 7.811,
+        "t1": 9.064,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 1.0,
+        "finger_after_mm": 40.0,
+        "moved": true,
+        "expected_motion": true
+      }
+    ],
+    [
+      {
+        "step": 1,
+        "kind": "direct",
+        "target": 0.04,
+        "label": "direct 0.04",
+        "t0": 3.856,
+        "t1": 5.124,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 0.0,
+        "finger_after_mm": 40.0,
+        "moved": true,
+        "expected_motion": true
+      },
+      {
+        "step": 2,
+        "kind": "direct",
+        "target": 0.0,
+        "label": "direct 0.0",
+        "t0": 5.124,
+        "t1": 6.487,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 40.0,
+        "finger_after_mm": 0.0,
+        "moved": true,
+        "expected_motion": true
+      },
+      {
+        "step": 3,
+        "kind": "direct",
+        "target": 0.001,
+        "label": "direct 0.001",
+        "t0": 6.487,
+        "t1": 7.539,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 0.0,
+        "finger_after_mm": 1.0,
+        "moved": false,
+        "expected_motion": false
+      },
+      {
+        "step": 4,
+        "kind": "direct",
+        "target": 0.04,
+        "label": "direct 0.04",
+        "t0": 7.539,
+        "t1": 8.837,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 1.0,
+        "finger_after_mm": 40.0,
+        "moved": true,
+        "expected_motion": true
+      }
+    ],
+    [
+      {
+        "step": 1,
+        "kind": "direct",
+        "target": 0.04,
+        "label": "direct 0.04",
+        "t0": 4.545,
+        "t1": 5.798,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 0.0,
+        "finger_after_mm": 40.0,
+        "moved": true,
+        "expected_motion": true
+      },
+      {
+        "step": 2,
+        "kind": "direct",
+        "target": 0.0,
+        "label": "direct 0.0",
+        "t0": 5.798,
+        "t1": 7.86,
+        "result": "ABORTED (reached_goal=False, stalled=True)",
+        "finger_before_mm": 40.0,
+        "finger_after_mm": 40.0,
+        "moved": false,
+        "expected_motion": true
+      },
+      {
+        "step": 3,
+        "kind": "direct",
+        "target": 0.001,
+        "label": "direct 0.001",
+        "t0": 7.86,
+        "t1": 9.913,
+        "result": "ABORTED (reached_goal=False, stalled=True)",
+        "finger_before_mm": 40.0,
+        "finger_after_mm": 40.0,
+        "moved": false,
+        "expected_motion": true
+      },
+      {
+        "step": 4,
+        "kind": "direct",
+        "target": 0.04,
+        "label": "direct 0.04",
+        "t0": 9.913,
+        "t1": 11.001,
+        "result": "SUCCEEDED (reached_goal=True, stalled=False)",
+        "finger_before_mm": 40.0,
+        "finger_after_mm": 40.0,
+        "moved": false,
+        "expected_motion": false
+      }
+    ]
+  ]
+}
