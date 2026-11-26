@@ -14,6 +14,7 @@
   <exec_depend>arm_sim</exec_depend>
   <exec_depend>arm_control</exec_depend>
   <exec_depend>arm_traj_gen</exec_depend>
+  <exec_depend>fr3_moveit_config</exec_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
