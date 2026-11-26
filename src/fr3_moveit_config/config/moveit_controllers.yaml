@@ -5,6 +5,7 @@ moveit_controller_manager: moveit_simple_controller_manager/MoveItSimpleControll
 moveit_simple_controller_manager:
   controller_names:
     - fr3_arm_controller
+    - hand_controller
 
   fr3_arm_controller:
     type: FollowJointTrajectory
@@ -17,4 +18,11 @@ moveit_simple_controller_manager:
       - fr3_joint6
       - fr3_joint7
     action_ns: follow_joint_trajectory
+    default: true
+
+  hand_controller:
+    type: ParallelGripperCommand
+    joints:
+      - fr3_finger_joint1
+    action_ns: gripper_cmd
     default: true
