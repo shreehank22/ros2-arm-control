@@ -11,6 +11,9 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(pinocchio REQUIRED)
 find_package(arm_kinodynamics REQUIRED)
+find_package(control_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
+find_package(rclcpp_action REQUIRED)
 
 # Quintic trajectory library
 add_library(${PROJECT_NAME}
@@ -44,6 +47,26 @@ ament_target_dependencies(traj_gen_node
   ament_index_cpp
   rclcpp
   sensor_msgs
+)
+
+# FollowJointTrajectory action server: streams MoveIt trajectories to /desired_joint_states
+add_executable(trajectory_action_server
+  src/trajectory_action_server.cpp
+)
+
+target_link_libraries(trajectory_action_server
+  Eigen3::Eigen
+  pinocchio::pinocchio
+  arm_kinodynamics::arm_kinodynamics
+)
+
+ament_target_dependencies(trajectory_action_server
+  ament_index_cpp
+  rclcpp
+  rclcpp_action
+  sensor_msgs
+  trajectory_msgs
+  control_msgs
 )
 
 # Unit tests
@@ -85,7 +108,7 @@ install(
 
 # Install executable where ros2 run expects it
 install(
-  TARGETS traj_gen_node
+  TARGETS traj_gen_node trajectory_action_server
   DESTINATION lib/${PROJECT_NAME}
 )
 
