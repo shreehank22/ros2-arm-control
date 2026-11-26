@@ -10,8 +10,8 @@
     2. Renamed the root link "base" to "world" so the arm is fixed to the world in Gazebo.
     3. Rewrote mesh paths package://franka_description/ -> package://arm_sim/
        (meshes copied into arm_sim/meshes with franka_description's LICENSE and NOTICE).
-    4. Added the ros2_control block (effort-commanded arm, position-commanded fingers) and
-       the gz_ros2_control <gazebo> plugin at the end of the file.
+    4. Added the ros2_control block (effort-commanded arm, position-commanded finger 1 with
+       finger 2 as its mimic) and the gz_ros2_control <gazebo> plugin at the end of the file.
 
   The plugin's <parameters> path uses $(find arm_control): load this file through xacro
   (as sim.launch.py does) so it resolves to the installed gz_controllers.yaml.
@@ -553,11 +553,10 @@
         <param name="initial_value">0.0</param>
       </state_interface>
     </joint>
-    <!-- gripper: both fingers are listed. Gazebo's default physics engine (DART) does not support
-         the URDF <mimic> on fr3_finger_joint2, so without its own entry that finger is undriven.
-         Listed here, gz_ros2_control holds both fingers until a gripper controller commands them.
-         mimic="false" tells ros2_control to treat fr3_finger_joint2 as an independent joint
-         (otherwise it rejects the command interface on a URDF mimic joint). -->
+    <!-- gripper: fr3_finger_joint1 is commanded (by hand_controller). fr3_finger_joint2 mimics it in
+         the URDF; Gazebo's default physics engine (DART) does not support the <mimic> tag, so
+         gz_ros2_control applies it instead: it copies finger 1's position command to finger 2.
+         A mimic joint must not have a command interface, so finger 2 only has state interfaces. -->
     <joint name="fr3_finger_joint1">
       <command_interface name="position"/>
       <state_interface name="position">
@@ -567,8 +566,7 @@
         <param name="initial_value">0.0</param>
       </state_interface>
     </joint>
-    <joint name="fr3_finger_joint2" mimic="false">
-      <command_interface name="position"/>
+    <joint name="fr3_finger_joint2">
       <state_interface name="position">
         <param name="initial_value">0.0</param>
       </state_interface>
