@@ -5,6 +5,7 @@ being published when effort_controller activates and the arm never hangs unpower
 trajectory_action_server starts only after the effort_controller spawner from sim.launch.py has
 finished. It holds the arm at its first measured pose and executes MoveIt trajectories on
 /fr3_arm_controller/follow_joint_trajectory by streaming them to /desired_joint_states.
+planning_scene_setup adds the platform and the ground to MoveIt's planning scene, so plans avoid them.
 """
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, LogInfo, RegisterEventHandler
@@ -57,6 +58,18 @@ def generate_launch_description():
         parameters=[{"use_sim_time": True}],
     )
 
+    # Adds the platform and the ground to MoveIt's planning scene once move_group is up, then exits.
+    planning_scene_setup = Node(
+        package="arm_bringup",
+        executable="planning_scene_setup",
+        output="screen",
+        parameters=[PathJoinSubstitution([
+            FindPackageShare("arm_bringup"),
+            "config",
+            "planning_scene.yaml"
+        ])],
+    )
+
     # The effort_controller spawner lives inside sim.launch.py, so it is matched by its
     # command line rather than by reference.
     def start_control_nodes(event, context):
@@ -77,4 +90,5 @@ def generate_launch_description():
         sim,
         controller_node,
         moveit,
+        planning_scene_setup,
     ])
