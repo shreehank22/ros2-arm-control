@@ -1,14 +1,15 @@
 # ROS 2 Franka FR3 Arm Control
 
-A ROS 2 Jazzy simulation and control stack for a Franka FR3 arm with the Franka Hand. It uses Pinocchio for rigid-body dynamics, a PD controller with gravity compensation, quintic joint trajectories, Gazebo Sim and `ros2_control`.
+A ROS 2 Jazzy simulation and control stack for a Franka FR3 arm with the Franka Hand. It uses Pinocchio for rigid-body dynamics, a PD controller with gravity compensation, MoveIt 2 for motion planning, quintic joint trajectories, Gazebo Sim and `ros2_control`.
 
 ## Packages
 
 - `arm_sim`: FR3 + hand URDF and meshes, Gazebo world, simulation launch
 - `arm_control`: PD + gravity-compensation controller (`controller_node`) and the `ros2_control` controller configuration
-- `arm_traj_gen`: quintic joint trajectory generator (`traj_gen_node`) with URDF joint-limit checks
+- `arm_traj_gen`: quintic joint trajectory generator (`traj_gen_node`) with URDF joint-limit checks, and the `FollowJointTrajectory` action server (`trajectory_action_server`) that executes MoveIt trajectories
+- `fr3_moveit_config`: MoveIt configuration for the FR3 (SRDF, KDL kinematics, joint limits, controller config) and `moveit_sim.launch.py` (`move_group` + RViz)
 - `arm_kinodynamics`: Pinocchio library: arm model loading, kinematics, Jacobian and dynamics
-- `arm_bringup`: launch file for the full system
+- `arm_bringup`: launch files for the full system, with or without MoveIt
 - `arm_description`: RViz display launch
 
 ## How it fits together
@@ -26,11 +27,24 @@ traj_gen_node ──/desired_joint_states──▶ controller_node ──/effort
   - `TRACKING`: PD + gravity compensation on the desired trajectory
 - `traj_gen_node` reads the arm's current position, checks the start and the target against the URDF joint limits, and publishes a 5 s quintic move of `fr3_joint1` by +0.1 rad.
 
+With MoveIt, `trajectory_action_server` takes the place of `traj_gen_node`:
+
+```
+RViz ──▶ move_group ──FollowJointTrajectory──▶ trajectory_action_server ──/desired_joint_states──▶ controller_node ──▶ Gazebo
+          (planning)   /fr3_arm_controller/          ▲                                                   │
+                       follow_joint_trajectory       └──────────────────/joint_states────────────────────┘
+```
+
+- `trajectory_action_server` holds the arm at its first measured pose. When a trajectory arrives, it streams it to `/desired_joint_states` at 1 kHz, using cubic interpolation between the trajectory points (positions and velocities), then holds the final point.
+- A cancel (RViz **Stop**) freezes the arm where it is. A new goal replaces a running one. Goals with the wrong joints or point sizes, or sent before the first joint state, are rejected.
+- Trajectory timing follows the simulation clock (`use_sim_time`), the same clock `move_group` uses.
+
 ## Requirements
 
 - ROS 2 Jazzy (`/opt/ros/jazzy`)
 - Gazebo Sim Harmonic
 - `ros2_control`, `gz_ros2_control`, `ros_gz_sim`, `ros_gz_bridge`, `xacro`
+- MoveIt 2 (`ros-jazzy-moveit`)
 - Pinocchio 4 (e.g. from robotpkg in `/opt/openrobots`)
 - `colcon`
 
@@ -65,6 +79,34 @@ ros2 launch arm_bringup full_system.launch.py headless:=true
 
 The arm spawns at the home pose `[0, -π/4, 0, -3π/4, 0, π/2, π/4]`, then rotates joint 1 by 0.1 rad over 5 s and holds.
 
+### Motion planning with MoveIt
+
+Starts the full system with `trajectory_action_server` instead of `traj_gen_node`, plus `move_group` and RViz:
+
+```bash
+QT_QPA_PLATFORM=xcb ros2 launch arm_bringup moveit_system.launch.py
+```
+
+`QT_QPA_PLATFORM=xcb` makes RViz use X11. On a Wayland desktop, RViz otherwise fails with `Unable to create the rendering window`. Add `headless:=true` to run Gazebo without its GUI.
+
+Once the log shows `Holding initial position.`, in RViz's **MotionPlanning** panel:
+
+1. Planning Group `fr3_arm`, Start State `<current>`.
+2. Set a goal: drag the marker at the hand, or choose a Goal State such as `ready` or `<random valid>`.
+3. **Plan** to preview, or **Plan & Execute** to move the arm in Gazebo. **Stop** cancels the motion.
+
+The RViz config saves the marker size (MotionPlanning → Planning Request → Interactive Marker Size) and the path preview (Planned Path → Loop Animation). Change them in RViz, then **File → Save Config**.
+
+A trajectory can also be sent without RViz. This one moves joint 1 to 0.3 rad over 3 s and prints the tracking feedback:
+
+```bash
+ros2 action send_goal --feedback /fr3_arm_controller/follow_joint_trajectory control_msgs/action/FollowJointTrajectory \
+"{trajectory: {joint_names: [fr3_joint1, fr3_joint2, fr3_joint3, fr3_joint4, fr3_joint5, fr3_joint6, fr3_joint7],
+  points: [{positions: [0.3, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854], time_from_start: {sec: 3}}]}}"
+```
+
+Don't run `traj_gen_node` at the same time: both nodes publish `/desired_joint_states`.
+
 ### Simulation only
 
 Starts Gazebo, the `/clock` bridge and `robot_state_publisher`, spawns the FR3, and loads `joint_state_broadcaster` and `effort_controller`:
@@ -96,6 +138,25 @@ Without the simulation, `display.launch.py` starts `robot_state_publisher` with 
 ros2 launch arm_description display.launch.py
 ```
 
+## Controller performance
+
+The FR3 following five tool paths planned by MoveIt, in the horizontal plane at z = 0.40 m, at ≤ 0.08 m/s, with the current gains (`Kp = [200, 200, 200, 200, 50, 50, 5]`, `Kd = [20, 20, 20, 20, 5, 5, 0.2]`):
+
+| Path | Tool tracking error, max / RMS |
+|---|---|
+| Two-point line | 2.04 / 1.79 mm |
+| Square | 2.38 / 1.63 mm |
+| Diamond | 2.31 / 1.74 mm |
+| Circle | 3.46 / 1.80 mm |
+| Curved path | 2.29 / 1.60 mm |
+
+![FR3 tracking a square](docs/media/fr3_trajectories/square_final.png)
+
+- Joint friction (0.2 Nm in the URDF) leaves a dead band of 0.2 Nm / Kp on each joint: 40 mrad on joint 7 and 1.2–1.3 mm of tool offset when the arm stops.
+- Near configurations where joint 2 is about 0, joints 1 and 3 chatter, and the error reached 33.7 mm.
+
+Videos, plots, the planned trajectories, run logs and the script to regenerate them are in [docs/media/fr3_trajectories](docs/media/fr3_trajectories/README.md).
+
 ## Tests
 
 ```bash
@@ -113,6 +174,7 @@ ros2 topic echo /joint_states                 # measured joint states (arm + fin
 ros2 topic echo /desired_joint_states         # trajectory generator output
 ros2 topic echo /effort_controller/commands   # controller torques (fr3_joint1..7)
 ros2 topic echo /clock                        # simulation time
+ros2 action info /fr3_arm_controller/follow_joint_trajectory   # MoveIt execution: 1 action server expected
 ```
 
 ## Troubleshooting
@@ -121,6 +183,10 @@ ros2 topic echo /clock                        # simulation time
 - **`bad substitution` / `No module named 'ament_package'` during the build**: the `.zsh` setup files were sourced from bash. Use `setup.bash` in bash, or switch to zsh.
 - **The arm shakes**: check for duplicate nodes left over from an earlier launch with `ros2 node list | sort | uniq -c`, and stop them (`pkill -f controller_node`, `pkill -f traj_gen_node`, `pkill -f "gz sim"`).
 - **`[Err] [Physics.cc] ... mimic constraint for joint [fr3_finger_joint2]`**: harmless. Gazebo's default physics engine does not support the URDF mimic tag, so both fingers are driven directly through `ros2_control` instead.
+- **RViz or the MoveIt Setup Assistant crashes with `Unable to create the rendering window`**: start it with `QT_QPA_PLATFORM=xcb` (Wayland desktops).
+- **Execute fails with `Action client not connected to action server: fr3_arm_controller/follow_joint_trajectory`**: `trajectory_action_server` isn't running, for example when `moveit_sim.launch.py` was started on its own. Use `moveit_system.launch.py`.
+- **`No 3D sensor plugin(s) defined for octomap updates`**: harmless; there's no depth sensor.
+- **`move_group` prints a stack trace or `exit code -11` on Ctrl+C**: a known MoveIt crash on exit in Jazzy, after it has already stopped. Harmless.
 
 ## Robot model
 
