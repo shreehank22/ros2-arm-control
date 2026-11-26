@@ -1,0 +1,25 @@
+moveit_setup_assistant_config:
+  urdf:
+    package: arm_sim
+    relative_path: urdf/fr3.urdf
+  srdf:
+    relative_path: config/fr3.srdf
+  package_settings:
+    author_name: Shreehan Santosh Kate
+    author_email: skate@wpi.edu
+    generated_timestamp: 1795669697
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
+  modified_urdf:
+    xacros:
+      - control_xacro
+  control_xacro:
+    command:
+      - position
+    state:
+      - position
+      - velocity
