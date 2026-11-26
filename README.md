@@ -9,7 +9,7 @@ A ROS 2 Jazzy simulation and control stack for a Franka FR3 arm with the Franka 
 - `arm_traj_gen`: quintic joint trajectory generator (`traj_gen_node`) with URDF joint-limit checks, and the `FollowJointTrajectory` action server (`trajectory_action_server`) that executes MoveIt trajectories
 - `fr3_moveit_config`: MoveIt configuration for the FR3 (SRDF, KDL kinematics, joint limits, controller config) and `moveit_sim.launch.py` (`move_group` + RViz)
 - `arm_kinodynamics`: Pinocchio library: arm model loading, kinematics, Jacobian and dynamics
-- `arm_bringup`: launch files for the full system, with or without MoveIt
+- `arm_bringup`: launch files for the full system, with or without MoveIt, and `planning_scene_setup`, which adds the platform and the ground to MoveIt's planning scene
 - `arm_description`: RViz display launch
 
 ## How it fits together
@@ -38,6 +38,9 @@ RViz ──▶ move_group ──FollowJointTrajectory──▶ trajectory_action
 - `trajectory_action_server` holds the arm at its first measured pose. When a trajectory arrives, it streams it to `/desired_joint_states` at 1 kHz, using cubic interpolation between the trajectory points (positions and velocities), then holds the final point.
 - A cancel (RViz **Stop**) freezes the arm where it is. A new goal replaces a running one. Goals with the wrong joints or point sizes, or sent before the first joint state, are rejected.
 - Trajectory timing follows the simulation clock (`use_sim_time`), the same clock `move_group` uses.
+- `planning_scene_setup` adds the robot platform and the ground to MoveIt's planning scene as collision boxes once `move_group` is up, then exits. Plans then avoid them.
+  - The sizes and positions are in `arm_bringup/config/planning_scene.yaml`, in MoveIt's frame (the robot base). They must match `arm_sim/worlds/fr3_world.sdf`, where the robot is spawned at z = 0.4 m.
+  - The platform box sits 5 mm below the base, because `fr3_link0`'s collision mesh rests exactly on the platform top. Without the gap, every start state would count as in collision.
 
 ## Requirements
 
@@ -104,6 +107,8 @@ ros2 action send_goal --feedback /fr3_arm_controller/follow_joint_trajectory con
 "{trajectory: {joint_names: [fr3_joint1, fr3_joint2, fr3_joint3, fr3_joint4, fr3_joint5, fr3_joint6, fr3_joint7],
   points: [{positions: [0.3, -0.7854, 0.0, -2.3562, 0.0, 1.5708, 0.7854], time_from_start: {sec: 3}}]}}"
 ```
+
+The platform and the ground show in RViz as green boxes (MotionPlanning → Scene Geometry). A goal inside them turns the arm red and can't be planned to.
 
 Don't run `traj_gen_node` at the same time: both nodes publish `/desired_joint_states`.
 
